@@ -20,6 +20,7 @@ import { MistakesView as Mistakes } from './components/MistakesView'
 import { PlanView } from './components/PlanView'
 import { SettingsForm } from './components/SettingsForm'
 import { TutorView } from './components/TutorView'
+import { VisionBridge } from './components/VisionBridge'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { defaultSettings, streamChat } from './lib/ai'
 import { compressImageFile, MAX_IMAGES } from './lib/image'
@@ -126,6 +127,7 @@ export default function App() {
   const [mistakeDraft, setMistakeDraft] = useState<
     Omit<Mistake, 'id' | 'createdAt'> | null
   >(null)
+  const [visionQuestion, setVisionQuestion] = useState<{text: string; subject?: Subject} | null>(null)
   const [pendingImages, setPendingImages] = useState<string[]>([])
   const [imageError, setImageError] = useState('')
   const abortRef = useRef<AbortController | null>(null)
@@ -213,7 +215,7 @@ export default function App() {
         messages: [...history, userMessage].map((message) => ({
           role: message.role,
           content: message.content,
-          images: message.images,
+          // 文字模型仅收到文本，原始图片不进入后续请求。
         })),
         signal: controller.signal,
         onContent: (chunk) => {
@@ -247,7 +249,7 @@ export default function App() {
     }
   }
 
-  function sendQuestion(textOverride?: string, subjectOverride?: Subject) {
+  function sendQuestion(textOverride?: string, subjectOverride?: Subject, verifiedDiagram?: string) {
     const text = (textOverride ?? input).trim()
     const hasImages = pendingImages.length > 0
     if ((!text && !hasImages) || loading) return
@@ -258,14 +260,18 @@ export default function App() {
       return
     }
 
+    if (hasImages && verifiedDiagram === undefined) {
+      setVisionQuestion({text, subject: subjectOverride})
+      return
+    }
+    const finalText = verifiedDiagram ? `${text || '请根据图像信息解题。'}\n\n【已核对的图像材料】\n${verifiedDiagram}\n\n仅依据上述材料推理；若仍有缺失或不确定信息请指出，不要臆造。` : text
     const activeSubject =
       subjectOverride ?? (subject === 'all' ? detectSubject(text || '读图解题') : subject)
     const activeMode = mode
     const userMessage: ChatMessage = {
       id: createId(),
       role: 'user',
-      content: text,
-      images: hasImages ? [...pendingImages] : undefined,
+      content: finalText,
     }
     setPendingImages([])
     setImageError('')
@@ -382,6 +388,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {visionQuestion && <VisionBridge images={pendingImages} question={visionQuestion.text} onClose={() => setVisionQuestion(null)} onConfirm={description => {const q = visionQuestion; setVisionQuestion(null); sendQuestion(q.text, q.subject, description)}} />}
       {mobileNavOpen && (
         <button
           type="button"
