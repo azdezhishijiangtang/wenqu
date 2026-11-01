@@ -9,9 +9,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start:modlens": "node scripts/modlens-server.mjs",
+    "test:modlens": "node --test tests/modlens-server.test.mjs",
+    "doctor:modlens": "node scripts/modlens-server.mjs --doctor"
   },
   "dependencies": {
+    "@liustack/modlens": "3.27.2",
     "@tesseract.js-data/chi_sim": "^1.0.0",
     "@tesseract.js-data/eng": "^1.0.0",
     "katex": "^0.19.1",
