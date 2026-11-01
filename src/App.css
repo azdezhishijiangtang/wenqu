@@ -1,5 +1,13 @@
 .pending-images,.bubble-images,.composer-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pending-images{padding:8px 12px}.pending-thumb{position:relative;margin:0;width:76px;height:68px}.pending-thumb img{width:100%;height:100%;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:white}.thumb-remove{position:absolute;right:-4px;top:-4px;border:0;border-radius:50%;background:var(--ink);color:white;cursor:pointer}.thumb-add,.image-trigger{position:relative;display:inline-flex;align-items:center;gap:4px;cursor:pointer}.thumb-add{padding:16px;border:1px dashed var(--line);border-radius:6px}.thumb-add input,.image-trigger input{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer}.bubble-images img{max-width:180px;max-height:160px;object-fit:contain;border-radius:6px}.image-error{color:var(--danger);font-size:12px;margin:5px 12px}.composer-topline{flex-wrap:wrap}
 
+.ocr-originals { display: grid; gap: 12px; }
+.ocr-originals summary { cursor: pointer; padding: 8px 0; }
+.ocr-image-scroll { overflow: auto; max-height: 55vh; border: 1px solid var(--line); background: white; }
+.ocr-image-scroll img { display: block; max-width: none; }
+.ocr-question { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ocr-confirm { display: flex; align-items: flex-start; gap: 10px; margin: 16px 0; cursor: pointer; }
+.ocr-confirm input { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 3px; }
+
 :root {
   --paper: #f5f3ed;
   --paper-deep: #eeebe2;

@@ -270,7 +270,7 @@ export function TutorView({
                 </div>
                 <div className="empty-hint">
                   <BookOpen size={15} />
-                  工艺流程、函数图象、受力图？直接截图粘贴进来，配视觉模型即可读图解题。
+                  截图粘贴即可免费提取文字；核对公式、补充图形关系后，交给你的文字模型解题。
                 </div>
               </div>
             ) : (
@@ -467,7 +467,7 @@ export function TutorView({
                 onPaste={handlePaste}
                 placeholder={
                   pendingImages.length
-                    ? '补充题干文字（可选），发送后 AI 会结合图片解答…'
+                    ? '补充问题（可选），发送后先免费提取文字并核对…'
                     : '输入题目、你的思路，或直接粘贴题目截图…'
                 }
                 rows={2}
