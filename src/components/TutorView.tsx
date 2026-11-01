@@ -1,7 +1,24 @@
-import { BookOpen, NotebookPen, Plus, Sparkles } from 'lucide-react'
+import {
+  BookOpen,
+  BrainCircuit,
+  ChevronDown,
+  Layers,
+  NotebookPen,
+  Plus,
+  Send,
+  Sparkles,
+  Timer,
+  Zap,
+} from 'lucide-react'
 import type { KeyboardEvent, RefObject } from 'react'
 import { useFocusTimer } from '../hooks/useFocusTimer'
-import type { ChatMessage, Subject, SubjectFilter, TutorMode } from '../types'
+import { subjectLabel } from '../data/subjects'
+import type {
+  ChatMessage,
+  Subject,
+  SubjectFilter,
+  TutorMode,
+} from '../types'
 import { greeting, todayLabel } from '../lib/utils'
 import { MarkdownContent } from './MarkdownContent'
 
@@ -17,6 +34,8 @@ interface TutorViewProps {
   onSubjectChange: (subject: SubjectFilter) => void
   onModeChange: (mode: TutorMode) => void
   onSend: (text?: string) => void
+  onFollowup: (question: string) => void
+  onUnlockNextHint: (message: ChatMessage) => void
   onStop: () => void
   onOpenSettings: () => void
   onNewChat: () => void
@@ -28,46 +47,59 @@ interface TutorViewProps {
 const starters = [
   {
     subject: 'math' as const,
-    label: '数学',
+    label: '数学 · 压轴',
     icon: '∑',
-    title: '讲讲导数压轴题的单调性讨论',
-    text: '已知函数 f(x)=x³-3ax+1，讨论它的单调区间。请一步步带我分析，并说明参数怎样分类。',
+    title: '导数题的单调性与分类讨论',
+    text: '已知函数 f(x)=x³-3ax+1（a∈R），讨论它的单调区间。我是含参分类总是漏情况，请按「考点定位 → 分类标准 → 逐类讨论」带我走一遍，并说明为什么要按这个标准分。',
   },
   {
     subject: 'physics' as const,
-    label: '物理',
+    label: '物理 · 模型',
     icon: 'v',
-    title: '传送带模型怎么判断摩擦力',
-    text: '一个物块轻放在水平匀速运动的传送带上，速度从零开始增加到与传送带相同。请帮我分析整个过程中的受力、加速度和位移关系。',
-  },
-  {
-    subject: 'math' as const,
-    label: '数学',
-    icon: '△',
-    title: '圆锥曲线联立总是算错',
-    text: '椭圆 x²/4 + y² = 1 与直线 y=kx+1 相交于 A、B 两点，求 k 的取值范围。请讲清楚联立方程时怎样减少计算错误。',
-  },
-  {
-    subject: 'physics' as const,
-    label: '物理',
-    icon: '◎',
-    title: '带电粒子在磁场中的轨迹',
-    text: '一带正电粒子垂直射入匀强磁场，请解释洛伦兹力为什么始终不做功，以及如何确定圆周运动的圆心和半径。',
+    title: '传送带模型的力与运动',
+    text: '物块轻放在水平匀速传动的传送带上，从静止加速到与带同速。请先识别模型和需要注意的分界条件，再分析受力、加速度和位移，最后告诉我这类题有哪些现成结论可以直接用。',
   },
   {
     subject: 'chemistry' as const,
-    label: '化学',
+    label: '化学 · 平衡',
     icon: '⚗',
-    title: '化学平衡移动怎么判断',
-    text: '在密闭容器中进行合成氨反应 N₂(g)+3H₂(g)⇌2NH₃(g)，达到平衡后增大压强。请判断平衡移动方向，并解释浓度、转化率和平衡常数分别如何变化。',
+    title: '平衡移动与 K 的独立',
+    text: '密闭容器中 N₂(g)+3H₂(g)⇌2NH₃(g) 达到平衡后缩小体积增大压强。请用三段式分析移动方向，并说明浓度、转化率、K 各自怎么变——重点是"哪些量永远不会变"。',
   },
   {
     subject: 'biology' as const,
-    label: '生物',
+    label: '生物 · 遗传',
     icon: '○',
-    title: '光合作用与呼吸作用曲线',
-    text: '请帮我梳理光合作用与细胞呼吸的曲线题：如何判断净光合速率、总光合速率，以及光补偿点和光饱和点的含义。',
+    title: '9:3:3:1 的变式拆解',
+    text: '两对相对性状的杂合子杂交得 9:3:3:1。请教我怎么把"异常比例"（如 9:7、12:3:1、15:1）反推出基因间的相互作用，给我一套判读规则而不是死记。',
   },
+  {
+    subject: 'math' as const,
+    label: '数学 · 圆锥曲线',
+    icon: '△',
+    title: '联立计算总出错的解法',
+    text: '椭圆 x²/4 + y² = 1 与直线 y=kx+1 交于 A、B 两点。请讲清联立时怎么通过设而不求、韦达定理减少计算量，判别式和取值范围怎么严谨收尾。',
+  },
+  {
+    subject: 'physics' as const,
+    label: '物理 · 场与粒子',
+    icon: '◎',
+    title: '带电粒子圆轨迹的确定',
+    text: '正粒子垂直射入匀强磁场。请说明洛伦兹力为什么不做功、怎么定圆心找半径，以及"平移进出场速度方向找圆心"这类作图技巧的原理。',
+  },
+]
+
+const modeMeta: { id: TutorMode; label: string; icon: typeof Zap; title: string }[] = [
+  { id: 'guide', label: '启发引导', icon: Layers, title: '先给切入点，你回复"继续"逐级解锁关键步骤与完整解答' },
+  { id: 'explain', label: '完整精讲', icon: BrainCircuit, title: '考点定位 → 隐含条件 → 路线 → 详解 → 易错点 → 变式' },
+  { id: 'exam', label: '应试速解', icon: Zap, title: '最快解法 + 二级结论，直接能抄进答题卡的精简过程' },
+]
+
+const followups = [
+  { label: '换一种方法', text: '换一种解法（一题多解），并对比两种方法各适合什么场景。' },
+  { label: '为什么这一步成立', text: '上面过程中最关键的一步为什么成立？从依据讲起，可以代个具体数值验证。' },
+  { label: '出更难的变式', text: '给这道题出一个更难的变式（改参数或加约束），先给新题，再给一句方向提示。' },
+  { label: '再讲细一点', text: '我还有一步没跟上，把最容易卡住的那一步拆得更细，讲慢一点。' },
 ]
 
 function TimerChip() {
@@ -81,10 +113,34 @@ function TimerChip() {
       onClick={timer.toggle}
       title="点击开始或暂停 25 分钟专注计时"
     >
-      <span className="timer-dot" />
+      <Timer size={12} />
       {minutes}:{String(seconds).padStart(2, '0')}
-      <span className="timer-label">{timer.running ? '专注中' : '专注'}</span>
     </button>
+  )
+}
+
+function ModeBadge({ mode }: { mode?: TutorMode }) {
+  const meta = modeMeta.find((item) => item.id === mode)
+  if (!meta) return null
+  const Icon = meta.icon
+  return (
+    <span className="mode-badge">
+      <Icon size={11} />
+      {meta.label}
+    </span>
+  )
+}
+
+function ReasoningFold({ text }: { text: string }) {
+  return (
+    <details className="reasoning-fold">
+      <summary>
+        <BrainCircuit size={12} />
+        思考过程
+        <span>模型推理原始输出，与正文分开</span>
+      </summary>
+      <div className="reasoning-body">{text}</div>
+    </details>
   )
 }
 
@@ -100,6 +156,8 @@ export function TutorView({
   onSubjectChange,
   onModeChange,
   onSend,
+  onFollowup,
+  onUnlockNextHint,
   onStop,
   onOpenSettings,
   onNewChat,
@@ -115,7 +173,10 @@ export function TutorView({
   }
 
   const isEmpty = messages.length === 0
-  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')
+  const lastAssistant = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.content)
+  const showFollowups = !loading && !isEmpty && Boolean(lastAssistant)
 
   return (
     <section className="tutor-view">
@@ -123,7 +184,7 @@ export function TutorView({
         <div>
           <p className="eyebrow">{todayLabel()}</p>
           <h1>
-            {greeting()}，把今天卡住的题<span className="accent-dot">.</span>
+            {greeting()}，把卡住的题讲透<span className="accent-dot">.</span>
           </h1>
         </div>
         <div className="header-actions">
@@ -142,10 +203,9 @@ export function TutorView({
                 <div className="empty-mark" aria-hidden="true">
                   <Sparkles size={22} />
                 </div>
-                <h2>一道题，讲到你真正会</h2>
+                <h2>不重复课本，只解决「不会做」</h2>
                 <p>
-                  拍照暂时不上传也没关系。把题干、你的思路或卡住的那一步写下来，
-                  我们一起把问题拆开。
+                  把题干和你卡住的那一步发过来。考什么、陷阱在哪、怎么落笔、为什么会算错——按你选的模式来。
                 </p>
                 <div className="starter-grid">
                   {starters.map((starter) => (
@@ -170,16 +230,13 @@ export function TutorView({
                 </div>
                 <div className="empty-hint">
                   <BookOpen size={15} />
-                  不确定怎么写？先描述“已知、求什么、你试过什么”。
+                  建议附上你的尝试或卡点，讲解会更有针对性。
                 </div>
               </div>
             ) : (
               <div className="message-list">
                 {messages.map((message) => (
-                  <article
-                    key={message.id}
-                    className={`message ${message.role}`}
-                  >
+                  <article key={message.id} className={`message ${message.role}`}>
                     {message.role === 'assistant' && (
                       <div className="assistant-avatar" aria-hidden="true">
                         知
@@ -190,10 +247,20 @@ export function TutorView({
                         <>
                           <div className="message-meta">
                             <span>知弧老师</span>
-                            {loading && message === messages[messages.length - 1] && (
-                              <span className="thinking">正在推演</span>
+                            {message.subject && (
+                              <span className="meta-subject">
+                                {subjectLabel(message.subject)}
+                              </span>
                             )}
+                            <ModeBadge mode={message.mode} />
+                            {loading &&
+                              message === messages[messages.length - 1] && (
+                                <span className="thinking">正在推演</span>
+                              )}
                           </div>
+                          {message.reasoning && (
+                            <ReasoningFold text={message.reasoning} />
+                          )}
                           <div className="assistant-content">
                             {message.content ? (
                               <div className="prose-content">
@@ -209,6 +276,19 @@ export function TutorView({
                           </div>
                           {message.content && !loading && (
                             <div className="answer-actions">
+                              {message.mode === 'guide' &&
+                                (message.hintLevel ?? 0) < 3 && (
+                                  <button
+                                    type="button"
+                                    className="text-button accent"
+                                    onClick={() => onUnlockNextHint(message)}
+                                  >
+                                    <ChevronDown size={14} />
+                                    {message.hintLevel === 1
+                                      ? '解锁第 2 级 · 关键步骤'
+                                      : '解锁第 3 级 · 完整解答'}
+                                  </button>
+                                )}
                               <button
                                 type="button"
                                 className="text-button"
@@ -216,7 +296,7 @@ export function TutorView({
                                   navigator.clipboard?.writeText(message.content)
                                 }
                               >
-                                复制解答
+                                复制
                               </button>
                               <button
                                 type="button"
@@ -234,12 +314,6 @@ export function TutorView({
                     </div>
                   </article>
                 ))}
-                {loading && (
-                  <div className="stream-status">
-                    <span className="pulse-dot" />
-                    正在组织讲解
-                  </div>
-                )}
                 {error && (
                   <div className="error-card" role="alert">
                     <strong>这次没有连上 AI</strong>
@@ -259,6 +333,24 @@ export function TutorView({
               </div>
             )}
           </div>
+
+          {showFollowups && (
+            <div className="followup-bar">
+              <span className="followup-label">继续追问</span>
+              <div className="followup-chips">
+                {followups.map((item) => (
+                  <button
+                    type="button"
+                    key={item.label}
+                    disabled={loading}
+                    onClick={() => onFollowup(item.text)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="composer-wrap">
             <div className="composer">
@@ -285,23 +377,22 @@ export function TutorView({
                     ),
                   )}
                 </div>
-                <div className="mode-switch">
-                  <button
-                    type="button"
-                    className={mode === 'guide' ? 'active' : ''}
-                    onClick={() => onModeChange('guide')}
-                    title="先给你思路提示，不直接公布完整答案"
-                  >
-                    启发式
-                  </button>
-                  <button
-                    type="button"
-                    className={mode === 'explain' ? 'active' : ''}
-                    onClick={() => onModeChange('explain')}
-                    title="给出完整步骤与详细讲解"
-                  >
-                    完整讲解
-                  </button>
+                <div className="mode-switch" role="group" aria-label="讲解模式">
+                  {modeMeta.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className={mode === item.id ? 'active' : ''}
+                        onClick={() => onModeChange(item.id)}
+                        title={item.title}
+                      >
+                        <Icon size={11} />
+                        {item.label}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
               <textarea
@@ -317,14 +408,15 @@ export function TutorView({
                 <button
                   type="button"
                   className="quiet-link"
-                  onClick={() =>
-                    onOpenFormula(
-                      subject === 'all' ? 'math' : subject,
-                    )
-                  }
+                  onClick={() => onOpenFormula(subject === 'all' ? 'math' : subject)}
                 >
-                  查看公式速查
+                  知识手册
                 </button>
+                {mode === 'guide' && (
+                  <span className="guide-hint">
+                    引导模式：AI 只给切入点，回复「继续」逐级解锁
+                  </span>
+                )}
                 <button
                   type="button"
                   className={`send-button${loading ? ' stop' : ''}`}
@@ -335,7 +427,7 @@ export function TutorView({
                   {loading ? (
                     <span className="stop-square" />
                   ) : (
-                    <Sparkles size={17} />
+                    <Send size={14} />
                   )}
                   {loading ? '停止' : '发送'}
                 </button>
@@ -347,11 +439,8 @@ export function TutorView({
                 <button type="button" onClick={onOpenSettings}>
                   连接你的 API Key
                 </button>
-                后即可获得完整讲解。
+                后即可开始。
               </p>
-            )}
-            {lastUserMessage && hasApiKey && (
-              <p className="composer-footnote">Enter 发送 · Shift + Enter 换行</p>
             )}
           </div>
         </div>

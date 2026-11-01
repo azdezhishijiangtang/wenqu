@@ -21,11 +21,12 @@ import { PlanView } from './components/PlanView'
 import { SettingsForm } from './components/SettingsForm'
 import { TutorView } from './components/TutorView'
 import { useLocalStorage } from './hooks/useLocalStorage'
-import { streamChat } from './lib/ai'
+import { defaultSettings, streamChat } from './lib/ai'
 import { createId } from './lib/utils'
 import type {
   ApiSettings,
   ChatMessage,
+  HintLevel,
   Mistake,
   Subject,
   SubjectFilter,
@@ -33,12 +34,6 @@ import type {
   TutorMode,
   View,
 } from './types'
-
-const defaultSettings: ApiSettings = {
-  baseUrl: 'https://api.deepseek.com/v1',
-  model: 'deepseek-chat',
-  apiKey: '',
-}
 
 const navItems = [
   { id: 'tutor' as const, label: 'AI 答疑', note: '问题与讲解', icon: Sparkles },
@@ -57,11 +52,11 @@ const subjectMeta: Record<Subject, { label: string; icon: typeof Atom }> = {
 const subjectHints: { subject: Subject; words: string[] }[] = [
   {
     subject: 'chemistry',
-    words: ['化学', '反应', '溶液', '离子', '氧化', '还原', '摩尔', '平衡', '有机', '元素周期', 'ph'],
+    words: ['化学', '反应', '溶液', '离子', '氧化', '还原', '摩尔', '平衡', '有机', '元素周期', 'pH'],
   },
   {
     subject: 'biology',
-    words: ['生物', '细胞', '遗传', '基因', '光合', '呼吸作用', '酶', '生态', '种群', 'dna', '蛋白质'],
+    words: ['生物', '细胞', '遗传', '基因', '光合', '呼吸作用', '酶', '生态', '种群', 'DNA', '蛋白质'],
   },
   {
     subject: 'physics',
@@ -74,7 +69,8 @@ function detectSubject(text: string): Subject {
   const best = subjectHints
     .map(({ subject, words }) => ({
       subject,
-      score: words.filter((word) => normalized.includes(word)).length,
+      score: words.filter((word) => normalized.toLowerCase().includes(word.toLowerCase()))
+        .length,
     }))
     .sort((a, b) => b.score - a.score)[0]
   return best.score > 0 ? best.subject : 'math'
@@ -90,8 +86,7 @@ function makeMistakeDraft(
     .find((message) => message.role === 'assistant' && message.content)
   const question = lastUser?.content ?? ''
   return {
-    subject:
-      currentSubject === 'all' ? detectSubject(question) : currentSubject,
+    subject: currentSubject === 'all' ? detectSubject(question) : currentSubject,
     title: question ? question.replace(/\s+/g, ' ').slice(0, 30) : '',
     question,
     cause: '',
@@ -100,31 +95,31 @@ function makeMistakeDraft(
   }
 }
 
+/** 兼容旧版本保存的设置：缺的高级字段用默认值补齐 */
+function mergeSettings(stored: ApiSettings): ApiSettings {
+  return { ...defaultSettings(), ...stored }
+}
+
 export default function App() {
   const [view, setView] = useState<View>('tutor')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settings, setSettings] = useLocalStorage<ApiSettings>(
+  const [storedSettings, setSettings] = useLocalStorage<ApiSettings>(
     'zhihu-api-settings',
-    defaultSettings,
+    defaultSettings(),
   )
+  const settings = mergeSettings(storedSettings)
   const [messages, setMessages] = useLocalStorage<ChatMessage[]>(
     'zhihu-chat-messages',
     [],
   )
-  const [subject, setSubject] = useLocalStorage<SubjectFilter>(
-    'zhihu-subject',
-    'math',
-  )
-  const [mode, setMode] = useState<TutorMode>('explain')
+  const [subject, setSubject] = useLocalStorage<SubjectFilter>('zhihu-subject', 'math')
+  const [mode, setMode] = useLocalStorage<TutorMode>('zhihu-mode', 'explain')
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formulaSubject, setFormulaSubject] = useState<Subject>('math')
-  const [mistakes, setMistakes] = useLocalStorage<Mistake[]>(
-    'zhihu-mistakes',
-    [],
-  )
+  const [mistakes, setMistakes] = useLocalStorage<Mistake[]>('zhihu-mistakes', [])
   const [tasks, setTasks] = useLocalStorage<Task[]>('zhihu-tasks', [])
   const [mistakeDraft, setMistakeDraft] = useState<
     Omit<Mistake, 'id' | 'createdAt'> | null
@@ -142,9 +137,7 @@ export default function App() {
     }
   }, [messages, loading, error])
 
-  useEffect(() => {
-    return () => abortRef.current?.abort()
-  }, [])
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   function navigate(next: View) {
     setView(next)
@@ -156,31 +149,29 @@ export default function App() {
     setView('formulas')
   }
 
-  async function sendQuestion(textOverride?: string, subjectOverride?: Subject) {
-    const text = (textOverride ?? input).trim()
-    if (!text || loading) return
-    if (!settings.apiKey.trim()) {
-      setInput(text)
-      setError('')
-      setSettingsOpen(true)
-      return
-    }
-
-    const activeSubject =
-      subjectOverride ?? (subject === 'all' ? detectSubject(text) : subject)
-    const userMessage: ChatMessage = {
-      id: createId(),
-      role: 'user',
-      content: text,
-    }
-    const assistantId = createId()
+  /** 骨架：构造请求、流式写回 assistant 消息 */
+  async function runChat(
+    history: ChatMessage[],
+    userMessage: ChatMessage,
+    assistantId: string,
+    options: {
+      activeSubject: Subject
+      activeMode: TutorMode
+      isFollowup: boolean
+      hintLevel: HintLevel
+      question: string
+    },
+  ) {
     const assistantMessage: ChatMessage = {
       id: assistantId,
       role: 'assistant',
       content: '',
+      mode: options.activeMode,
+      subject: options.activeSubject,
+      hintLevel: options.hintLevel,
+      question: options.question,
     }
-    const previousMessages = messages
-    setMessages([...previousMessages, userMessage, assistantMessage])
+    setMessages([...history, userMessage, assistantMessage])
     setInput('')
     setError('')
     setLoading(true)
@@ -191,18 +182,28 @@ export default function App() {
     try {
       await streamChat({
         settings,
-        subject: activeSubject,
-        mode,
-        messages: [...previousMessages, userMessage].map((message) => ({
+        subject: options.activeSubject,
+        mode: options.activeMode,
+        isFollowup: options.isFollowup,
+        messages: [...history, userMessage].map((message) => ({
           role: message.role,
           content: message.content,
         })),
         signal: controller.signal,
-        onChunk: (chunk) => {
+        onContent: (chunk) => {
           setMessages((current) =>
             current.map((message) =>
               message.id === assistantId
                 ? { ...message, content: message.content + chunk }
+                : message,
+            ),
+          )
+        },
+        onReasoning: (chunk) => {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? { ...message, reasoning: (message.reasoning ?? '') + chunk }
                 : message,
             ),
           )
@@ -218,19 +219,78 @@ export default function App() {
           ),
         )
       } else {
-        const message =
-          caught instanceof Error ? caught.message : '发生了未知错误，请重试。'
-        setError(message)
+        setError(caught instanceof Error ? caught.message : '发生了未知错误，请重试。')
         setMessages((current) =>
-          current.filter(
-            (item) => item.id !== assistantId || item.content.trim() !== '',
-          ),
+          current.filter((item) => item.id !== assistantId || item.content.trim() !== ''),
         )
       }
     } finally {
       setLoading(false)
       abortRef.current = null
     }
+  }
+
+  function sendQuestion(textOverride?: string, subjectOverride?: Subject) {
+    const text = (textOverride ?? input).trim()
+    if (!text || loading) return
+    if (!settings.apiKey.trim()) {
+      setInput(text)
+      setError('')
+      setSettingsOpen(true)
+      return
+    }
+
+    const activeSubject =
+      subjectOverride ?? (subject === 'all' ? detectSubject(text) : subject)
+    const activeMode = mode
+    const userMessage: ChatMessage = {
+      id: createId(),
+      role: 'user',
+      content: text,
+    }
+    void runChat(messages, userMessage, createId(), {
+      activeSubject,
+      activeMode,
+      isFollowup: false,
+      hintLevel: activeMode === 'guide' ? 1 : 0,
+      question: text,
+    })
+  }
+
+  /** 快捷追问：同一道题深入 */
+  function followup(question: string) {
+    if (loading || !lastAnsweredQuestion) return
+    const activeSubject = lastAnsweredSubject
+    const userMessage: ChatMessage = {
+      id: createId(),
+      role: 'user',
+      content: question,
+    }
+    void runChat(messages, userMessage, createId(), {
+      activeSubject,
+      activeMode: lastAnsweredMode,
+      isFollowup: true,
+      hintLevel: lastAnsweredHint,
+      question: lastAnsweredQuestion,
+    })
+  }
+
+  /** 引导模式：解锁下一级提示 */
+  function unlockNextHint(assistantMessage: ChatMessage) {
+    if (loading) return
+    const nextLevel = Math.min(3, (assistantMessage.hintLevel ?? 1) + 1) as HintLevel
+    const userMessage: ChatMessage = {
+      id: createId(),
+      role: 'user',
+      content: '继续',
+    }
+    void runChat(messages, userMessage, createId(), {
+      activeSubject: assistantMessage.subject ?? 'math',
+      activeMode: 'guide',
+      isFollowup: true,
+      hintLevel: nextLevel,
+      question: assistantMessage.question ?? assistantMessage.content,
+    })
   }
 
   function stopGeneration() {
@@ -250,11 +310,7 @@ export default function App() {
 
   function saveMistake(draft: Omit<Mistake, 'id' | 'createdAt'>) {
     setMistakes((current) => [
-      {
-        ...draft,
-        id: createId(),
-        createdAt: new Date().toISOString().slice(0, 10),
-      },
+      { ...draft, id: createId(), createdAt: new Date().toISOString().slice(0, 10) },
       ...current,
     ])
     setMistakeDraft(null)
@@ -271,6 +327,14 @@ export default function App() {
   function addTask(task: Omit<Task, 'id' | 'done'>) {
     setTasks((current) => [...current, { ...task, id: createId(), done: false }])
   }
+
+  const lastAnswered = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.content)
+  const lastAnsweredQuestion = lastAnswered?.question
+  const lastAnsweredSubject = lastAnswered?.subject ?? 'math'
+  const lastAnsweredMode = lastAnswered?.mode ?? mode
+  const lastAnsweredHint = (lastAnswered?.hintLevel ?? 0) as HintLevel
 
   return (
     <div className="app-shell">
@@ -371,17 +435,11 @@ export default function App() {
             </span>
             <span className="api-status-copy">
               <strong>{settings.apiKey ? 'AI 通道已配置' : '连接你的 AI'}</strong>
-              <small>
-                {settings.apiKey
-                  ? settings.model || '未填写模型'
-                  : '在本地保存 API Key'}
-              </small>
+              <small>{settings.apiKey ? settings.model || '未填写模型' : '在本地保存 API Key'}</small>
             </span>
             <Settings2 size={15} className="api-gear" />
           </button>
-          <p className="local-note">
-            密钥仅存储在当前浏览器
-          </p>
+          <p className="local-note">密钥仅存储在当前浏览器</p>
         </div>
       </aside>
 
@@ -421,6 +479,8 @@ export default function App() {
             onSubjectChange={setSubject}
             onModeChange={setMode}
             onSend={sendQuestion}
+            onFollowup={followup}
+            onUnlockNextHint={unlockNextHint}
             onStop={stopGeneration}
             onOpenSettings={() => setSettingsOpen(true)}
             onNewChat={newChat}
@@ -448,16 +508,12 @@ export default function App() {
                 onToggle={(id) =>
                   setMistakes((current) =>
                     current.map((mistake) =>
-                      mistake.id === id
-                        ? { ...mistake, mastered: !mistake.mastered }
-                        : mistake,
+                      mistake.id === id ? { ...mistake, mastered: !mistake.mastered } : mistake,
                     ),
                   )
                 }
                 onDelete={(id) =>
-                  setMistakes((current) =>
-                    current.filter((mistake) => mistake.id !== id),
-                  )
+                  setMistakes((current) => current.filter((mistake) => mistake.id !== id))
                 }
                 onNew={() =>
                   setMistakeDraft({
@@ -525,8 +581,8 @@ export default function App() {
               <div className="provider-note">
                 <strong>提示</strong>
                 <p>
-                  如果接口支持浏览器跨域访问，前端即可直接请求。若服务商禁止 CORS，
-                  需要另外部署一个转发接口，本站不会接触你的密钥。
+                  如果接口支持浏览器跨域访问，前端即可直接请求；若服务商禁止
+                  CORS，需要另外部署一个转发接口。连接失败时先用「测试连接」定位原因。
                 </p>
               </div>
             </div>
