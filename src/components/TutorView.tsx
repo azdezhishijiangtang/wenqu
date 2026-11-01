@@ -2,15 +2,17 @@ import {
   BookOpen,
   BrainCircuit,
   ChevronDown,
+  ImagePlus,
   Layers,
   NotebookPen,
   Plus,
   Send,
   Sparkles,
   Timer,
+  X,
   Zap,
 } from 'lucide-react'
-import type { KeyboardEvent, RefObject } from 'react'
+import type { ClipboardEvent, KeyboardEvent, RefObject } from 'react'
 import { useEffect, useState } from 'react'
 import { useFocusTimer } from '../hooks/useFocusTimer'
 import { subjectLabel } from '../data/subjects'
@@ -42,6 +44,10 @@ interface TutorViewProps {
   onNewChat: () => void
   onOpenFormula: (subject: Subject) => void
   onAddMistake: () => void
+  pendingImages: string[]
+  imageError: string
+  onAddImages: (files: File[]) => void
+  onRemoveImage: (index: number) => void
   messagesEndRef: RefObject<HTMLDivElement | null>
 }
 
@@ -182,12 +188,26 @@ export function TutorView({
   onNewChat,
   onOpenFormula,
   onAddMistake,
+  pendingImages,
+  imageError,
+  onAddImages,
+  onRemoveImage,
   messagesEndRef,
 }: TutorViewProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       onSend()
+    }
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(event.clipboardData.files).filter((file) =>
+      file.type.startsWith('image/'),
+    )
+    if (files.length) {
+      event.preventDefault()
+      onAddImages(files)
     }
   }
 
@@ -250,7 +270,7 @@ export function TutorView({
                 </div>
                 <div className="empty-hint">
                   <BookOpen size={15} />
-                  建议附上你的尝试或卡点，讲解会更有针对性。
+                  工艺流程、函数图象、受力图？直接截图粘贴进来，配视觉模型即可读图解题。
                 </div>
               </div>
             ) : (
@@ -336,7 +356,24 @@ export function TutorView({
                           )}
                         </>
                       ) : (
-                        <div className="user-bubble">{message.content}</div>
+                        <div className="user-bubble">
+                          {message.images && message.images.length > 0 && (
+                            <div className="bubble-images">
+                              {message.images.map((image, index) => (
+                                <a
+                                  key={index}
+                                  href={image}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="点开查看原图"
+                                >
+                                  <img src={image} alt={`题目图片 ${index + 1}`} />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          {message.content}
+                        </div>
                       )}
                     </div>
                   </article>
@@ -427,19 +464,72 @@ export function TutorView({
                 value={input}
                 onChange={(event) => onInputChange(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="输入题目、你的思路，或直接问一个概念…"
+                onPaste={handlePaste}
+                placeholder={
+                  pendingImages.length
+                    ? '补充题干文字（可选），发送后 AI 会结合图片解答…'
+                    : '输入题目、你的思路，或直接粘贴题目截图…'
+                }
                 rows={2}
                 disabled={loading}
                 aria-label="答疑输入框"
               />
+              {pendingImages.length > 0 && (
+                <div className="pending-images" aria-label="待发送图片">
+                  {pendingImages.map((image, index) => (
+                    <figure className="pending-thumb" key={`${index}-${image.length}`}>
+                      <img src={image} alt={`题目图片 ${index + 1}`} />
+                      <button
+                        type="button"
+                        className="thumb-remove"
+                        onClick={() => onRemoveImage(index)}
+                        aria-label={`删除图片 ${index + 1}`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </figure>
+                  ))}
+                  <label className="thumb-add">
+                    <ImagePlus size={15} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(event) => {
+                        onAddImages(Array.from(event.target.files ?? []))
+                        event.target.value = ''
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
+              {imageError && <p className="image-error">{imageError}</p>}
               <div className="composer-footer">
-                <button
-                  type="button"
-                  className="quiet-link"
-                  onClick={() => onOpenFormula(subject === 'all' ? 'math' : subject)}
-                >
-                  知识手册
-                </button>
+                <div className="composer-tools">
+                  <label
+                    className="quiet-link image-trigger"
+                    title={pendingImages.length >= 3 ? '最多 3 张' : '添加题目图片'}
+                  >
+                    <ImagePlus size={13} />
+                    题目图片
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(event) => {
+                        onAddImages(Array.from(event.target.files ?? []))
+                        event.target.value = ''
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="quiet-link"
+                    onClick={() => onOpenFormula(subject === 'all' ? 'math' : subject)}
+                  >
+                    知识手册
+                  </button>
+                </div>
                 {mode === 'guide' && (
                   <span className="guide-hint">
                     引导模式：AI 只给切入点，回复「继续」逐级解锁
@@ -449,7 +539,7 @@ export function TutorView({
                   type="button"
                   className={`send-button${loading ? ' stop' : ''}`}
                   onClick={loading ? onStop : () => onSend()}
-                  disabled={!loading && !input.trim()}
+                  disabled={!loading && !input.trim() && pendingImages.length === 0}
                   aria-label={loading ? '停止生成' : '发送问题'}
                 >
                   {loading ? (

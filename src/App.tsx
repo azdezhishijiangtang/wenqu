@@ -22,6 +22,7 @@ import { SettingsForm } from './components/SettingsForm'
 import { TutorView } from './components/TutorView'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { defaultSettings, streamChat } from './lib/ai'
+import { compressImageFile, MAX_IMAGES } from './lib/image'
 import { ThinkSplitter } from './lib/think'
 import { createId } from './lib/utils'
 import type {
@@ -125,6 +126,8 @@ export default function App() {
   const [mistakeDraft, setMistakeDraft] = useState<
     Omit<Mistake, 'id' | 'createdAt'> | null
   >(null)
+  const [pendingImages, setPendingImages] = useState<string[]>([])
+  const [imageError, setImageError] = useState('')
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -210,6 +213,7 @@ export default function App() {
         messages: [...history, userMessage].map((message) => ({
           role: message.role,
           content: message.content,
+          images: message.images,
         })),
         signal: controller.signal,
         onContent: (chunk) => {
@@ -245,7 +249,8 @@ export default function App() {
 
   function sendQuestion(textOverride?: string, subjectOverride?: Subject) {
     const text = (textOverride ?? input).trim()
-    if (!text || loading) return
+    const hasImages = pendingImages.length > 0
+    if ((!text && !hasImages) || loading) return
     if (!settings.apiKey.trim()) {
       setInput(text)
       setError('')
@@ -254,20 +259,44 @@ export default function App() {
     }
 
     const activeSubject =
-      subjectOverride ?? (subject === 'all' ? detectSubject(text) : subject)
+      subjectOverride ?? (subject === 'all' ? detectSubject(text || '读图解题') : subject)
     const activeMode = mode
     const userMessage: ChatMessage = {
       id: createId(),
       role: 'user',
       content: text,
+      images: hasImages ? [...pendingImages] : undefined,
     }
+    setPendingImages([])
+    setImageError('')
     void runChat(messages, userMessage, createId(), {
       activeSubject,
       activeMode,
       isFollowup: false,
       hintLevel: activeMode === 'guide' ? 1 : 0,
-      question: text,
+      question: text || '读图解题',
     })
+  }
+
+  async function addImages(files: File[]) {
+    if (!files.length) return
+    setImageError('')
+    const room = MAX_IMAGES - pendingImages.length
+    if (room <= 0) {
+      setImageError(`一次最多 ${MAX_IMAGES} 张图，先删掉一张再添加。`)
+      return
+    }
+    const accepted: string[] = []
+    for (const file of files.slice(0, room)) {
+      try {
+        accepted.push(await compressImageFile(file))
+      } catch (error) {
+        setImageError(error instanceof Error ? error.message : '图片处理失败。')
+      }
+    }
+    if (accepted.length) {
+      setPendingImages((current) => [...current, ...accepted].slice(0, MAX_IMAGES))
+    }
   }
 
   /** 快捷追问：同一道题深入 */
@@ -315,6 +344,8 @@ export default function App() {
     setMessages([])
     setInput('')
     setError('')
+    setPendingImages([])
+    setImageError('')
   }
 
   function openMistakeFromChat() {
@@ -499,6 +530,12 @@ export default function App() {
             onNewChat={newChat}
             onOpenFormula={openFormula}
             onAddMistake={openMistakeFromChat}
+            pendingImages={pendingImages}
+            imageError={imageError}
+            onAddImages={addImages}
+            onRemoveImage={(index) =>
+              setPendingImages((current) => current.filter((_, i) => i !== index))
+            }
             messagesEndRef={messagesEndRef}
           />
         )}

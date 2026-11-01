@@ -34,6 +34,8 @@ export interface ChatMessage {
   subject?: Subject
   /** 对应哪条用户提问，用于「继续深入」 */
   question?: string
+  /** 用户随题发送的图片（dataURL，已压缩），仅 user 消息 */
+  images?: string[]
 }
 
 export interface Formula {

@@ -12,7 +12,8 @@ const BASE_PROMPT = String.raw`你是「知弧」的高中理科答疑导师，�
 3. 结论和关键步骤必须严谨：数学含参必分类讨论；物理先写研究对象、过程模型、正方向，结果带单位和有效数字；化学方程式配平并注明条件；生物用教材术语，区分"事实"与"推测"。
 4. 用到高中大纲以外的工具（如洛必达、向量叉乘、构造函数以外的技巧）时，标注「超纲工具」，并给一个高中范围内的等价写法。
 5. 结尾给「变式一问」：改变题目一个条件，让学生自查是否真的懂了。
-6. 学生题目信息不全时，先列出缺失条件，不要编数据。`
+6. 学生题目信息不全时，先列出缺失条件，不要编数据。
+7. 学生发来图片（题目配图、工艺流程图、函数图象、受力分析图、实验装置图等）时：先用一小段明确读出图中关键信息——坐标轴与单位、曲线走势与特殊点、流程步骤与进出料、装置连接与试剂——与题干文字对照确认后再解题；图片模糊或信息不全时，说明你读到什么、哪部分存疑，请学生补充文字描述，禁止脑补图中没有的数据。`
 
 const SUBJECT_PROMPTS: Record<Subject, string> = {
   math: String.raw`数学科目要求：
@@ -66,7 +67,8 @@ interface ChatRequest {
   settings: ApiSettings
   subject: Subject
   mode: TutorMode
-  messages: { role: 'user' | 'assistant'; content: string }[]
+  /** 历史与最新消息，可含图片 */
+  messages: { role: 'user' | 'assistant'; content: string; images?: string[] }[]
   /** 最后一条用户消息是否为「继续/追问」类指令 */
   isFollowup?: boolean
   signal: AbortSignal
@@ -122,7 +124,7 @@ function deepMerge(
 
 export function buildRequestBody(
   settings: ApiSettings,
-  messages: { role: string; content: string }[],
+  messages: { role: string; content: unknown }[],
   stream = true,
 ): Record<string, unknown> {
   if (!settings.model.trim()) {
@@ -222,6 +224,38 @@ async function readErrorBody(response: Response): Promise<string> {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* 消息转换：纯文本 → string；带图 → 多模态 content 数组                  */
+/* ------------------------------------------------------------------ */
+
+type OutMessage = {
+  role: string
+  content:
+    | string
+    | (
+        | { type: 'text'; text: string }
+        | { type: 'image_url'; image_url: { url: string; detail: 'high' } }
+      )[]
+}
+
+function toOutMessage(message: {
+  role: 'user' | 'assistant'
+  content: string
+  images?: string[]
+}): OutMessage {
+  const images = message.role === 'user' ? (message.images ?? []).slice(0, 3) : []
+  if (images.length === 0) {
+    return { role: message.role, content: message.content }
+  }
+  const parts: Extract<OutMessage['content'], unknown[]> = [
+    { type: 'text', text: message.content || '请读图并解答这道题。' },
+  ]
+  for (const url of images) {
+    parts.push({ type: 'image_url', image_url: { url, detail: 'high' } })
+  }
+  return { role: message.role, content: parts }
+}
+
 export async function streamChat({
   settings,
   subject,
@@ -250,7 +284,7 @@ export async function streamChat({
             role: 'system',
             content: buildSystemPrompt(subject, mode, isFollowup),
           },
-          ...messages,
+          ...messages.map(toOutMessage),
         ]),
       ),
       signal,
