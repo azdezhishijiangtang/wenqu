@@ -2727,46 +2727,87 @@ button:disabled {
   font-size: 9px;
 }
 
-.reasoning-fold {
-  margin: 2px 0 8px;
-  border: 1px dashed #d4ddd4;
-  border-radius: 6px;
-  background: #f7f8f4;
+.reasoning-panel {
+  overflow: hidden;
+  margin: 2px 0 9px;
+  border: 1px solid #dde4d6;
+  border-left: 3px solid #a9c2ae;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #f7f9f3, #f3f5ec);
   font-size: 10px;
+  transition: border-color 160ms ease;
 }
 
-.reasoning-fold summary {
+.reasoning-panel.active {
+  border-left-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(30, 103, 89, 0.06);
+}
+
+.reasoning-head {
   display: flex;
+  width: 100%;
   align-items: center;
-  gap: 5px;
-  padding: 7px 10px;
-  color: var(--muted);
+  gap: 6px;
+  padding: 8px 11px;
+  border: 0;
+  color: var(--ink-soft);
+  background: none;
   cursor: pointer;
   font-weight: 600;
-  list-style: none;
+  text-align: left;
 }
 
-.reasoning-fold summary::-webkit-details-marker {
-  display: none;
+.reasoning-head:hover .reasoning-title {
+  color: var(--accent);
 }
 
-.reasoning-fold summary span {
+.reasoning-head svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.reasoning-panel.active .reasoning-head svg {
+  color: var(--accent);
+}
+
+.reasoning-head .spin-slow {
+  animation: spin 2.6s linear infinite;
+}
+
+.reasoning-title {
+  color: var(--ink-soft);
+}
+
+.reasoning-panel.active .reasoning-title {
+  color: var(--accent-strong);
+}
+
+.reasoning-meta {
+  margin-left: auto;
   color: var(--faint);
+  font-size: 9px;
   font-weight: 400;
 }
 
-.reasoning-fold[open] summary {
-  border-bottom: 1px dashed #e2e7de;
+.reasoning-head > svg:last-child {
+  color: var(--faint);
+  transition: transform 160ms ease;
+}
+
+.reasoning-head > svg.open {
+  transform: rotate(180deg);
 }
 
 .reasoning-body {
-  max-height: 220px;
-  padding: 9px 11px;
+  max-height: 250px;
+  padding: 8px 13px 11px;
   overflow-y: auto;
+  border-top: 1px dashed #e0e6d8;
   color: var(--muted);
   font-size: 10px;
-  line-height: 1.75;
+  line-height: 1.8;
   white-space: pre-wrap;
+  animation: rise-in 160ms ease-out;
 }
 
 .text-button.accent {
@@ -3164,15 +3205,26 @@ button:disabled {
     font-size: 8.5px;
   }
 
-  .reasoning-fold summary {
-    padding: 6px 8px;
+  .reasoning-panel {
+    margin-bottom: 7px;
+    border-radius: 6px;
+    font-size: 9px;
+  }
+
+  .reasoning-head {
+    padding: 6px 9px;
+    gap: 5px;
+  }
+
+  .reasoning-title {
     font-size: 9px;
   }
 
   .reasoning-body {
-    max-height: 160px;
-    padding: 7px 9px;
+    max-height: 170px;
+    padding: 6px 10px 9px;
     font-size: 9px;
+    line-height: 1.75;
   }
 
   .mode-badge {

@@ -11,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react'
 import type { KeyboardEvent, RefObject } from 'react'
+import { useEffect, useState } from 'react'
 import { useFocusTimer } from '../hooks/useFocusTimer'
 import { subjectLabel } from '../data/subjects'
 import type {
@@ -131,16 +132,34 @@ function ModeBadge({ mode }: { mode?: TutorMode }) {
   )
 }
 
-function ReasoningFold({ text }: { text: string }) {
+function ReasoningFold({ text, active }: { text: string; active: boolean }) {
+  const [open, setOpen] = useState(active)
+
+  useEffect(() => {
+    if (active) setOpen(true)
+  }, [active])
+
+  const charCount = text.replace(/\s/g, '').length
+
   return (
-    <details className="reasoning-fold">
-      <summary>
-        <BrainCircuit size={12} />
-        思考过程
-        <span>模型推理原始输出，与正文分开</span>
-      </summary>
-      <div className="reasoning-body">{text}</div>
-    </details>
+    <div className={`reasoning-panel${active ? ' active' : ''}${open ? ' open' : ''}`}>
+      <button
+        type="button"
+        className="reasoning-head"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <BrainCircuit size={13} className={active ? 'spin-slow' : ''} />
+        <span className="reasoning-title">{active ? '正在思考…' : '思考过程'}</span>
+        <span className="reasoning-meta">{charCount} 字</span>
+        <ChevronDown size={13} className={open ? 'open' : ''} />
+      </button>
+      {open && (
+        <div className="reasoning-body" role="region" aria-label="模型思考过程">
+          {text}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -173,6 +192,7 @@ export function TutorView({
   }
 
   const isEmpty = messages.length === 0
+  const lastId = messages[messages.length - 1]?.id
   const lastAssistant = [...messages]
     .reverse()
     .find((message) => message.role === 'assistant' && message.content)
@@ -235,7 +255,13 @@ export function TutorView({
               </div>
             ) : (
               <div className="message-list">
-                {messages.map((message) => (
+                {messages.map((message) => {
+                  const isThinking =
+                    loading &&
+                    message.id === lastId &&
+                    message.role === 'assistant' &&
+                    !message.content
+                  return (
                   <article key={message.id} className={`message ${message.role}`}>
                     {message.role === 'assistant' && (
                       <div className="assistant-avatar" aria-hidden="true">
@@ -254,19 +280,20 @@ export function TutorView({
                             )}
                             <ModeBadge mode={message.mode} />
                             {loading &&
-                              message === messages[messages.length - 1] && (
+                              message === messages[messages.length - 1] &&
+                              !isThinking && (
                                 <span className="thinking">正在推演</span>
                               )}
                           </div>
                           {message.reasoning && (
-                            <ReasoningFold text={message.reasoning} />
+                            <ReasoningFold text={message.reasoning} active={isThinking} />
                           )}
                           <div className="assistant-content">
                             {message.content ? (
                               <div className="prose-content">
                                 <MarkdownContent>{message.content}</MarkdownContent>
                               </div>
-                            ) : (
+                            ) : isThinking ? null : (
                               <span className="typing-indicator">
                                 <i />
                                 <i />
@@ -313,7 +340,8 @@ export function TutorView({
                       )}
                     </div>
                   </article>
-                ))}
+                  )
+                })}
                 {error && (
                   <div className="error-card" role="alert">
                     <strong>这次没有连上 AI</strong>

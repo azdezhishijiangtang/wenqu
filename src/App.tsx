@@ -22,6 +22,7 @@ import { SettingsForm } from './components/SettingsForm'
 import { TutorView } from './components/TutorView'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { defaultSettings, streamChat } from './lib/ai'
+import { ThinkSplitter } from './lib/think'
 import { createId } from './lib/utils'
 import type {
   ApiSettings,
@@ -179,6 +180,27 @@ export default function App() {
     const controller = new AbortController()
     abortRef.current = controller
 
+    /** <think> 标签剥离：网关型推理模型的思考混在 content 里 */
+    const splitter = new ThinkSplitter()
+    const appendContent = (chunk: string) => {
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId
+            ? { ...message, content: message.content + chunk }
+            : message,
+        ),
+      )
+    }
+    const appendReasoning = (chunk: string) => {
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId
+            ? { ...message, reasoning: (message.reasoning ?? '') + chunk }
+            : message,
+        ),
+      )
+    }
+
     try {
       await streamChat({
         settings,
@@ -191,24 +213,15 @@ export default function App() {
         })),
         signal: controller.signal,
         onContent: (chunk) => {
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === assistantId
-                ? { ...message, content: message.content + chunk }
-                : message,
-            ),
-          )
+          const { reasoning, content } = splitter.feed(chunk)
+          if (reasoning) appendReasoning(reasoning)
+          if (content) appendContent(content)
         },
-        onReasoning: (chunk) => {
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === assistantId
-                ? { ...message, reasoning: (message.reasoning ?? '') + chunk }
-                : message,
-            ),
-          )
-        },
+        onReasoning: appendReasoning,
       })
+      const tail = splitter.flush()
+      if (tail.reasoning) appendReasoning(tail.reasoning)
+      if (tail.content) appendContent(tail.content)
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') {
         setMessages((current) =>
