@@ -19,7 +19,15 @@ const notes = [
   {
     icon: Heart,
     title: '关注也是一种支持',
-    desc: '在 B 站搜索「阿z的知识讲堂」点个关注，免费的关注同样是最大的鼓励。',
+    desc: (
+      <>
+        网站更新、新项目和学科讲解都会发在 B 站，
+        <a href="https://b23.tv/E9ZSgYS" target="_blank" rel="noopener noreferrer">
+          「阿z的知识讲堂」
+        </a>
+        点个关注，免费的关注同样是最大的鼓励。
+      </>
+    ),
   },
 ]
 

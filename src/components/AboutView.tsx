@@ -1,4 +1,4 @@
-import { Atom, Bot, Heart, HandCoins, Sigma, Sparkles, Video } from 'lucide-react'
+import { Atom, Bot, ExternalLink, Heart, HandCoins, Sigma, Sparkles, Video } from 'lucide-react'
 
 interface Props {
   onOpenDonate: () => void
@@ -63,13 +63,40 @@ export function AboutView({ onOpenDonate, onOpenCustom }: Props) {
         ))}
       </section>
 
+      <section className="bili-card">
+        <span className="bili-mark" aria-hidden="true">
+          <Video size={22} />
+        </span>
+        <div className="bili-copy">
+          <h2>B 站：阿z的知识讲堂</h2>
+          <p>
+            网站的最新进展、新上线的项目，以及数学物理的学科知识讲解，我都会第一时间发在 B 站。
+            网站只是其中一部分，想看更完整的更新节奏和讲解视频，欢迎来我的空间逛逛。
+          </p>
+          <p className="bili-sub">关注一下，等于订阅了这个网站接下来会长成什么样子。</p>
+        </div>
+        <a
+          className="bili-button"
+          href="https://b23.tv/E9ZSgYS"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Video size={16} /> 去 B 站关注
+          <ExternalLink size={14} />
+        </a>
+      </section>
+
       <section className="guide-section">
         <h2>
           <Sparkles size={18} /> 我的心愿：免费的关注就是最大的鼓励
         </h2>
         <p>
           做内容不易，但我最大的心愿其实很简单——<strong>希望得到大家免费的关注</strong>。如果你还没关注
-          我的 B 站账号，在 B 站搜索「阿z的知识讲堂」点个关注就好，你的每一次关注都是我继续更新课程与网站的动力。
+          我的 B 站账号，点上面的按钮去
+          <a href="https://b23.tv/E9ZSgYS" target="_blank" rel="noopener noreferrer">
+            「阿z的知识讲堂」
+          </a>
+          点个关注就好，你的每一次关注都是我继续更新课程与网站的动力。
         </p>
         <p>
           如果这个网站对你真的很有帮助，也可以选择给我打赏，请根据自身情况量力而行——
