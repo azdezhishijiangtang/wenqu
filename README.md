@@ -67,7 +67,7 @@ npm run vision:deploy                    # 部署 Worker
 
 部署完成后把 Worker 地址写进 `public/vision-config.json` 的 `apiBase`（例如 `https://zhihu-study-vision.<子域>.workers.dev`），提交后 GitHub Pages 会自动重建。也可以构建时用 `VITE_VISION_API_URL` 指定同一个地址。
 
-本地可以运行 `npm run test:vision` 验证配额、跨天重置、失败退回、图片校验与令牌逻辑（使用内存假数据库，不消耗任何额度）。真实识图需要部署后在有可用免费额度的账号下验证。
+本地运行 `npm run test:vision` 会跑 18 项检查：配额单元测试（跨天重置、失败退回、图片校验、令牌）和接口端到端测试（注册、登录、识图、第 4 张被拒、模型出错退回）。测试使用内存假数据库与假模型，不消耗任何额度。真实识图仍需部署后在具备免费额度的账号下验证。
 
 ### 备用与边界
 

@@ -10,7 +10,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:vision": "node --test cloudflare/test/core.test.mjs",
+    "test:vision": "node --test cloudflare/test/core.test.mjs cloudflare/test/api.test.ts",
     "vision:deploy": "wrangler deploy --config cloudflare/wrangler.toml"
   },
   "dependencies": {
