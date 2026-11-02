@@ -36,6 +36,7 @@ import { defaultSettings, streamChat } from './lib/ai'
 import { compressImageFile, MAX_IMAGES } from './lib/image'
 import { ThinkSplitter } from './lib/think'
 import { createId } from './lib/utils'
+import { migrateLegacyStorage } from './lib/storageMigration'
 import type {
   ApiSettings,
   ChatMessage,
@@ -122,26 +123,27 @@ function mergeSettings(stored: ApiSettings): ApiSettings {
 }
 
 export default function App() {
+  migrateLegacyStorage()
   const [view, setView] = useState<View>('tutor')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [storedSettings, setSettings] = useLocalStorage<ApiSettings>(
-    'zhihu-api-settings',
+    'wenqu-api-settings',
     defaultSettings(),
   )
   const settings = mergeSettings(storedSettings)
   const [messages, setMessages] = useLocalStorage<ChatMessage[]>(
-    'zhihu-chat-messages',
+    'wenqu-chat-messages',
     [],
   )
-  const [subject, setSubject] = useLocalStorage<SubjectFilter>('zhihu-subject', 'math')
-  const [mode, setMode] = useLocalStorage<TutorMode>('zhihu-mode', 'explain')
+  const [subject, setSubject] = useLocalStorage<SubjectFilter>('wenqu-subject', 'math')
+  const [mode, setMode] = useLocalStorage<TutorMode>('wenqu-mode', 'explain')
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formulaSubject, setFormulaSubject] = useState<Subject>('math')
-  const [mistakes, setMistakes] = useLocalStorage<Mistake[]>('zhihu-mistakes', [])
-  const [tasks, setTasks] = useLocalStorage<Task[]>('zhihu-tasks', [])
+  const [mistakes, setMistakes] = useLocalStorage<Mistake[]>('wenqu-mistakes', [])
+  const [tasks, setTasks] = useLocalStorage<Task[]>('wenqu-tasks', [])
   const [mistakeDraft, setMistakeDraft] = useState<
     Omit<Mistake, 'id' | 'createdAt'> | null
   >(null)

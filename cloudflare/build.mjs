@@ -17,7 +17,7 @@ await build({
   legalComments: 'none',
   minify: false,
   banner: {
-    js: '// 知弧识图服务 · 单文件版，可直接粘贴到 Cloudflare 控制台的 Worker 编辑器。\n// 需要在 Settings → Bindings 里绑定 AI（变量名 AI）和 D1（变量名 DB），并设置 AUTH_SECRET。',
+    js: '// 问渠识图服务 · 单文件版，可直接粘贴到 Cloudflare 控制台的 Worker 编辑器。\n// 需要在 Settings → Bindings 里绑定 AI（变量名 AI）和 D1（变量名 DB），并设置 AUTH_SECRET。',
   },
 })
 console.log(`已生成 ${out}`)

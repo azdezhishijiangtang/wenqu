@@ -26,7 +26,7 @@ export class VisionError extends Error {
   }
 }
 
-const STORAGE_KEY = 'zhihu-vision-account'
+const STORAGE_KEY = 'wenqu-vision-account'
 let cachedBase: string | null = null
 
 export function loadAccount(): VisionAccount | null {
