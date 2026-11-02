@@ -10,12 +10,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "start:modlens": "node scripts/modlens-server.mjs",
-    "test:modlens": "node --test tests/modlens-server.test.mjs",
-    "doctor:modlens": "node scripts/modlens-server.mjs --doctor"
+    "test:vision": "node --test cloudflare/test/core.test.mjs",
+    "vision:deploy": "wrangler deploy --config cloudflare/wrangler.toml"
   },
   "dependencies": {
-    "@liustack/modlens": "3.27.2",
     "@tesseract.js-data/chi_sim": "^1.0.0",
     "@tesseract.js-data/eng": "^1.0.0",
     "katex": "^0.19.1",

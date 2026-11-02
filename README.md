@@ -1,6 +1,6 @@
 # 知弧 · 高中理科学习工作台
 
-面向高中生的数学、物理、化学、生物 AI 答疑与学习网站。支持静态前端与可选的 Modlens 本机增强版，解题 API Key 只保存在浏览器本地。
+面向高中生的数学、物理、化学、生物 AI 答疑与学习网站。解题 API Key 只保存在浏览器本地；图像理解由网站自带的云端服务提供，所有设备可用。
 
 ## 功能
 
@@ -27,7 +27,7 @@ npm run build      # 生产构建到 dist/
 
 请求由浏览器直接发往你填写的接口。如果服务商禁止浏览器跨域（CORS），需要自行部署一个转发接口，或把 API 地址换成你的同源代理地址。
 
-> 注意：解题请求由浏览器直接发送，不经过可选的 Modlens 本机服务。API Key 属于浏览器端凭据。不要在公共电脑上保存密钥，使用完可以点「清除密钥」。
+> 注意：解题请求由浏览器直接发送给你的模型接口，不经过本站的识图服务。API Key 属于浏览器端凭据，不要在公共电脑上保存，使用完可以点「清除密钥」。
 
 ## 免费图片文字提取
 
@@ -37,29 +37,43 @@ npm run build      # 生产构建到 dist/
 
 构建和开发启动前会自动运行 `scripts/prepare-ocr.mjs`，从 npm 依赖复制 Worker、WASM 引擎和中英文字库到 `public/ocr/`；GitHub Pages 子路径部署同样支持。资源随静态网站发布，运行时不依赖第三方识图 CDN。文字核对与图形补充仅在当前弹窗中暂存，请勿在完成前关闭。
 
-## Modlens 图形理解（本机增强版）
+## 云端图形理解（所有设备可用，按账号限次）
 
-已接入 `@liustack/modlens@3.27.2`，不仅能提取文字，还可借助视觉引擎返回布局、实体、关系和不确定项，再交给任意兼容的文字解题模型。Modlens 自身是桥接程序，不包含离线视觉模型。官方文档：[引擎说明](https://github.com/liustack/modlens#vision-engines-six-built-in-providers-four-reusable-clis-one-failover-chain)、[CLI 手册](https://github.com/liustack/modlens/blob/main/docs/cli.md)。
+网站内置了一个可公开访问的识图服务，部署在 Cloudflare Workers 上，调用 Workers AI 的视觉模型 `@cf/moondream/moondream3.1-9B-A2B`。访客在任何手机、平板或电脑上打开网站，用自己的识图账号登录即可上传题图，无需安装插件、无需各自的 API Key、也无需运行本机程序。
 
-本项目固定使用 `-p antigravity-cli`，**不自动回退到 Gemini API、OpenAI API 或其他付费/订阅接口**。Antigravity 路线由上游提供免费使用，受账号资格、地区、配额与服务政策限制；不能保证永久免费或无限额度。额度耗尽、未登录或不可用时会报错，可手动改用本地 OCR。图片会由本机 Modlens 交给 Antigravity 服务，只有 OCR 是本机离线计算。
+识别结果只包含「图像证据」（文字、坐标轴、箭头、连接关系、不确定项），交给你原本配置的文字解题模型推理。主模型不会收到原图。
 
-GitHub Pages 不能执行 Node.js/CLI。要使用 Modlens，请在自己的电脑或手机 Linux 环境运行本机增强版（Node >= 22.19）：
+### 额度分配
 
-1. 按 [Antigravity 官方说明](https://antigravity.google/cli) 安装 CLI，运行 `agy` 完成登录并退出（若提示找不到命令，可使用 `~/.local/bin/agy`）。本机服务也会检查该默认安装目录。登录及是否有免费使用资格由用户确认。
-2. 在项目目录执行：
+| 规则 | 默认值 | 说明 |
+| --- | --- | --- |
+| 每账号每天 | 3 张 | 按北京时间自然日计算，服务端扣减，换设备或清缓存都不能重置 |
+| 全站每天 | 60 张 | 兜住 Cloudflare 免费额度，避免少数人耗尽全站次数 |
+| 失败是否扣次 | 不扣 | 模型报错会原样退回本次占用的次数 |
 
-   ```bash
-   npm ci
-   npm run doctor:modlens
-   npm run build
-   npm run start:modlens
-   ```
+两个上限可改 `cloudflare/wrangler.toml` 的 `DAILY_USER_LIMIT`、`DAILY_GLOBAL_LIMIT` 后重新部署。Cloudflare 免费计划提供每天 10000 Neurons，额度用完只会报错、不会自动扣费；本项目不配置付费结算，也不会切换到付费模型。
 
-3. 打开 `http://127.0.0.1:4174`，上传题图并选择「Modlens 图形理解」。识别后逐项核对，再提交给解题模型。
+账号只用于计数：用户名 + 密码（PBKDF2 加盐，迭代 30000 次以适配免费版 10ms CPU 限制），服务端只保存密码哈希、盐和当天的识别张数，不保存聊天内容或图片。图片只在本次请求中传给视觉模型。
 
-本机增强版仅监听回环地址，提供网页和同源识图接口；拒绝跨站请求、任意本机路径与远程图片 URL。不会向公网暴露你的引擎登录。它与 GitHub Pages 是不同浏览器来源，API 设置、聊天和错题数据独立保存，需要在本机地址重新填写原来的解题接口。关闭服务后 Modlens 功能不可用；GitHub Pages 的 OCR 功能不受影响。普通 `npm run dev` 不提供 Modlens 接口。
+### 部署（手机也能完成）
 
-`npm run test:modlens` 检查本机服务契约与输入限制，测试使用模拟引擎，不消耗上游额度。真实图形理解需安装、登录并有可用免费额度后另行验证。
+```bash
+npx wrangler login                       # 浏览器里点一次授权
+npx wrangler d1 create zhihu-study       # 把返回的 database_id 填进 cloudflare/wrangler.toml
+npx wrangler d1 execute zhihu-study --remote --file=cloudflare/schema.sql
+npx wrangler secret put AUTH_SECRET --config cloudflare/wrangler.toml   # 随便填一段长随机字符串
+npm run vision:deploy                    # 部署 Worker
+```
+
+部署完成后把 Worker 地址写进 `public/vision-config.json` 的 `apiBase`（例如 `https://zhihu-study-vision.<子域>.workers.dev`），提交后 GitHub Pages 会自动重建。也可以构建时用 `VITE_VISION_API_URL` 指定同一个地址。
+
+本地可以运行 `npm run test:vision` 验证配额、跨天重置、失败退回、图片校验与令牌逻辑（使用内存假数据库，不消耗任何额度）。真实识图需要部署后在有可用免费额度的账号下验证。
+
+### 备用与边界
+
+- 未登录、未配置服务地址或额度用完时，仍可使用浏览器本地 OCR 和手工补充，主模型照样能答题。
+- 视觉模型对手写字、复杂公式和图形关系仍可能出错，因此流程强制「核对后再交给主模型」。
+- 免费额度受 Cloudflare 政策影响，无法承诺永久免费或无限量；额度耗尽当天暂停云端识图。
 
 ## 部署
 
