@@ -6,8 +6,11 @@ import {
   Check,
   FlaskConical,
   GraduationCap,
+  HandCoins,
+  HeartHandshake,
   KeyRound,
   Menu,
+  MessagesSquare,
   NotebookPen,
   Settings2,
   Sparkles,
@@ -16,7 +19,10 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
+import { AboutView } from './components/AboutView'
 import { AccountView } from './components/AccountView'
+import { CustomView } from './components/CustomView'
+import { DonateView } from './components/DonateView'
 import { FormulaView as Formulas } from './components/FormulaView'
 import { GuideView } from './components/GuideView'
 import { MistakeForm } from './components/MistakeForm'
@@ -49,6 +55,12 @@ const navItems = [
   { id: 'plan' as const, label: '学习计划', note: '专注与节奏', icon: CalendarDays },
   { id: 'account' as const, label: '账号与数据', note: '登录 · 备份', icon: UserRound },
   { id: 'guide' as const, label: '使用说明', note: '三分钟上手', icon: BookOpen },
+]
+
+const aboutNav = [
+  { id: 'about' as const, label: '关于开发者', note: '谁在做知弧', icon: HeartHandshake },
+  { id: 'donate' as const, label: '打赏开发者', note: '自愿支持', icon: HandCoins },
+  { id: 'custom' as const, label: '功能共建', note: '定制与建议', icon: MessagesSquare },
 ]
 
 const subjectMeta: Record<Subject, { label: string; icon: typeof Atom }> = {
@@ -452,6 +464,30 @@ export default function App() {
           })}
         </nav>
 
+        <div className="sidebar-label">关于与共建</div>
+        <nav className="main-nav" aria-label="关于与共建">
+          {aboutNav.map((item) => {
+            const Icon = item.icon
+            return (
+              <button
+                type="button"
+                key={item.id}
+                className={view === item.id ? 'active' : ''}
+                onClick={() => navigate(item.id)}
+              >
+                <span className="nav-icon">
+                  <Icon size={18} strokeWidth={1.8} />
+                </span>
+                <span className="nav-copy">
+                  <strong>{item.label}</strong>
+                  <small>{item.note}</small>
+                </span>
+                {view === item.id && <span className="nav-active-dot" />}
+              </button>
+            )
+          })}
+        </nav>
+
         <div className="sidebar-progress">
           <div className="sidebar-label">学习脉搏</div>
           <div className="mini-stats">
@@ -628,6 +664,24 @@ export default function App() {
                 onOpenSettings={() => setSettingsOpen(true)}
                 onOpenAccount={() => setView('account')}
                 onOpenTutor={() => navigate('tutor')}
+              />
+            )}
+            {view === 'about' && (
+              <AboutView
+                onOpenDonate={() => setView('donate')}
+                onOpenCustom={() => setView('custom')}
+              />
+            )}
+            {view === 'donate' && (
+              <DonateView
+                onOpenAbout={() => setView('about')}
+                onOpenCustom={() => setView('custom')}
+              />
+            )}
+            {view === 'custom' && (
+              <CustomView
+                onOpenAbout={() => setView('about')}
+                onOpenDonate={() => setView('donate')}
               />
             )}
           </div>
