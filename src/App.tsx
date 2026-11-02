@@ -36,7 +36,6 @@ import { defaultSettings, streamChat } from './lib/ai'
 import { compressImageFile, MAX_IMAGES } from './lib/image'
 import { ThinkSplitter } from './lib/think'
 import { createId } from './lib/utils'
-import { migrateLegacyStorage } from './lib/storageMigration'
 import type {
   ApiSettings,
   ChatMessage,
@@ -123,7 +122,6 @@ function mergeSettings(stored: ApiSettings): ApiSettings {
 }
 
 export default function App() {
-  migrateLegacyStorage()
   const [view, setView] = useState<View>('tutor')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
