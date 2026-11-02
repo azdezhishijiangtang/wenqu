@@ -151,18 +151,18 @@ export default {
           const results = []
           for (const image of images) {
             results.push(await env.AI.run(VISION_MODEL, {
-              task: 'query',
               image: image.dataUrl,
-              question: evidencePrompt(question),
-              reasoning: false,
+              prompt: evidencePrompt(question),
+              max_tokens: 1024,
               temperature: 0.1,
-              max_tokens: 4096,
             }))
           }
           return reply({ evidence: formatEvidence(results), quota: await readQuota(env.DB, user.sub, day, limits) }, 200, cors)
-        } catch {
+        } catch (error) {
           await releaseQuota(env.DB, user.sub, day, images.length)
-          return reply({ error: '识图服务暂时不可用，本次没有扣次数', quota: await readQuota(env.DB, user.sub, day, limits) }, 502, cors)
+          const detail = error instanceof Error ? error.message : ''
+          const hint = /50\d\d/.test(detail) ? `视觉模型调用失败：${detail.slice(0, 120)}` : '识图服务暂时不可用'
+          return reply({ error: `${hint}，本次没有扣次数`, quota: await readQuota(env.DB, user.sub, day, limits) }, 502, cors)
         }
       }
 

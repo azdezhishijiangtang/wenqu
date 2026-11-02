@@ -166,8 +166,9 @@ test('环境变量可覆盖限额，非法值回落到默认', () => {
 })
 
 test('识图结果统一包装，空结果给出明确提示', () => {
-  const output = formatEvidence([{ answer: ' 题干内容 ' }, {}])
+  const output = formatEvidence([{ response: ' 题干内容 ' }, { answer: '备用字段' }, {}])
   assert.match(output[0], /^【图片 1/)
   assert.match(output[0], /题干内容/)
-  assert.match(output[1], /未返回可用的图像信息/)
+  assert.match(output[1], /备用字段/)
+  assert.match(output[2], /未返回可用的图像信息/)
 })

@@ -12,7 +12,7 @@ binding = "AI"
 [[d1_databases]]
 binding = "DB"
 database_name = "zhihu-study"
-database_id = "FILL_WITH_D1_DATABASE_ID"
+database_id = "ddafc07b-8207-4838-976f-dec92e903762"
 
 [vars]
 # 每个账号每天可识别的图片张数
