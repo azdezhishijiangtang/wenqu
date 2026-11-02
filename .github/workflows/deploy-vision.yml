@@ -16,7 +16,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$ACCOUNT" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::未配置 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID，跳过识图服务部署。"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
   deploy:
+    needs: preflight
+    if: needs.preflight.outputs.ready == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           if wrangler secret list --config cloudflare/wrangler.toml 2>/dev/null | grep -q AUTH_SECRET; then
-            echo "AUTH_SECRET already set"
+            echo "AUTH_SECRET 已存在，保持不变（避免所有人被登出）"
           else
             openssl rand -hex 32 | wrangler secret put AUTH_SECRET --config cloudflare/wrangler.toml
           fi
@@ -63,4 +82,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: wrangler deploy --config cloudflare/wrangler.toml
+        run: |
+          wrangler deploy --config cloudflare/wrangler.toml 2>&1 | tee deploy.log
+          url=$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -1 || true)
+          if [ -n "$url" ]; then
+            echo "::notice::Worker 地址：$url —— 请填入 public/vision-config.json 的 apiBase"
+          fi
