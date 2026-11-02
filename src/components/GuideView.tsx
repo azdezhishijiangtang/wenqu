@@ -153,6 +153,7 @@ export function GuideView({ onOpenSettings, onOpenAccount, onOpenTutor }: Props)
         <ul className="guide-limits">
           <li>识图结果一定有出错的可能，尤其是手写、上下标、复杂公式和图形空间关系；请把它当作「帮你打字的助手」，不是标准答案。</li>
           <li>云端识图受免费额度限制，额度用完当天暂停，第二天恢复；不会自动转成付费服务。</li>
+          <li>识图服务用的是 <code>workers.dev</code> 域名，个别网络（尤其是部分国内网络）会连不上或被解析到错误地址。遇到「连不上识图服务」，先用本地 OCR，或者换 Wi-Fi / 移动网络再试。</li>
           <li>聊天记录存在浏览器里，清理浏览器数据或换设备不会自动保留，请定期导出备份。</li>
           <li>AI 的解答也可能有错，尤其是计算步骤和边界条件。重要结论请自己验算。</li>
         </ul>

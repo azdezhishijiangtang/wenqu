@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Download, LogIn, LogOut, Upload, UserRound } from 'lucide-react'
 import { useVisionAccount } from '../hooks/useVisionAccount'
+import { isReachable } from '../lib/visionApi'
 import {
   BackupError,
   backupFileName,
@@ -53,6 +54,13 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
   const [strategy, setStrategy] = useState<ImportStrategy>('replace')
   const [importError, setImportError] = useState('')
   const [imported, setImported] = useState('')
+  // null = 还在检测；false 时在账号区提示网络不通，建议用本地 OCR。
+  const [reachable, setReachable] = useState<boolean | null>(null)
+  useEffect(() => {
+    let alive = true
+    void isReachable().then((ok) => { if (alive) setReachable(ok) })
+    return () => { alive = false }
+  }, [])
 
   const currentSize = useMemo(
     () => new TextEncoder().encode(serializeBackup(buildBackup(snapshot, {
@@ -119,6 +127,13 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
 
       <section className="account-card">
         <h2><UserRound size={18} /> 识图账号</h2>
+        {reachable === false && (
+          <p className="form-warn">
+            <AlertTriangle size={14} />
+            当前网络连不上识图服务（部分网络会屏蔽该域名）。登录和云端识图会失败，
+            可以先在答疑页用「本地 OCR」或手工填写继续刷题；换 Wi-Fi / 移动网络后重新打开本页即可。
+          </p>
+        )}
         {!vision.account ? (
           <>
             <p className="account-hint">

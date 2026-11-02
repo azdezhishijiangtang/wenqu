@@ -64,21 +64,37 @@ export async function getApiBase(): Promise<string> {
   return cachedBase
 }
 
-async function request<T>(path: string, options: { method?: string; token?: string; body?: unknown } = {}): Promise<T> {
+/**
+ * 默认超时：登录类请求 20 秒，识图 90 秒（视觉模型本身就要 7–20 秒）。
+ * 部分网络会把 *.workers.dev 解析到错误地址并一路挂起，没有超时会一直转圈。
+ */
+function timeoutFor(path: string): number {
+  return path.includes('/vision/read') ? 90_000 : 20_000
+}
+
+async function request<T>(path: string, options: { method?: string; timeoutMs?: number; token?: string; body?: unknown } = {}): Promise<T> {
   const base = await getApiBase()
-  if (!base) throw new VisionError('云端识图还没有配置地址，暂时只能使用本地 OCR。', 0)
+  if (!base) throw new VisionError('云端识图还没有配置地址，暂时只能使用本地 OCR 或手工填写。', 0)
   const headers: Record<string, string> = {}
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
   if (options.token) headers.Authorization = `Bearer ${options.token}`
+  const timeoutMs = options.timeoutMs ?? timeoutFor(path)
   let response: Response
   try {
     response = await fetch(`${base}${path}`, {
       method: options.method ?? 'GET',
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: AbortSignal.timeout(timeoutMs),
     })
-  } catch {
-    throw new VisionError('连不上识图服务，请检查网络后重试。', 0)
+  } catch (caught) {
+    const timedOut = caught instanceof DOMException && (caught.name === 'TimeoutError' || caught.name === 'AbortError')
+    throw new VisionError(
+      timedOut
+        ? '识图服务响应超时。可能是网络无法访问该域名，请改用本地 OCR，或稍后重试。'
+        : '连不上识图服务。部分网络会屏蔽该域名，请改用本地 OCR，或换一个网络再试。',
+      0,
+    )
   }
   let data: { error?: string; quota?: VisionQuota } & Record<string, unknown> = {}
   try {
@@ -105,4 +121,19 @@ export function readImages(token: string, images: string[], question: string) {
     token,
     body: { images, question },
   })
+}
+
+/** 打开面板前先探活，避免用户点完识别才等 90 秒超时。 */
+export async function isReachable(): Promise<boolean> {
+  try {
+    const base = await getApiBase()
+    if (!base) return false
+    const response = await fetch(`${base}/api/health`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    })
+    return response.ok
+  } catch {
+    return false
+  }
 }
