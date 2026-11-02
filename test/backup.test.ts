@@ -81,7 +81,7 @@ test('往返后聊天、错题、计划、科目与模式都还在', () => {
 test('拒绝非本应用的 JSON、错误版本、坏 JSON 和空内容', () => {
   assert.throws(() => parseBackup(''), BackupError)
   assert.throws(() => parseBackup('不是 json'), /有效的 JSON/)
-  assert.throws(() => parseBackup(JSON.stringify({ app: 'other', version: 1, data: {} })), /不是知弧/)
+  assert.throws(() => parseBackup(JSON.stringify({ app: 'other', version: 1, data: {} })), /不是问渠/)
   assert.throws(() => parseBackup(JSON.stringify({ app: BACKUP_APP, version: 99, data: {} })), /版本/)
   assert.throws(() => parseBackup(JSON.stringify({ app: BACKUP_APP, version: 1 })), /没有数据/)
   assert.throws(() => parseBackup('[' + '1,'.repeat(10) + '1]'), /结构不正确/)
@@ -149,5 +149,5 @@ test('替换策略完全覆盖，合并策略跳过重复并保留现有聊天',
 
 test('文件名带时间戳，便于区分多次备份', () => {
   const name = backupFileName(new Date(2026, 10, 2, 15, 4))
-  assert.match(name, /^知弧备份-20261102-1504\.json$/)
+  assert.match(name, /^问渠备份-20261102-1504\.json$/)
 })

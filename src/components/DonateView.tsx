@@ -38,7 +38,7 @@ export function DonateView({ onOpenAbout, onOpenCustom }: Props) {
         <p className="eyebrow">SUPPORT THE CREATOR</p>
         <h1>打赏开发者</h1>
         <p className="page-sub">
-          创作不易。如果知弧对你真的有帮助，可以根据自身情况打赏感谢——每一笔心意都会变成更用心更新的动力。
+          创作不易。如果问渠对你真的有帮助，可以根据自身情况打赏感谢——每一笔心意都会变成更用心更新的动力。
         </p>
       </header>
 

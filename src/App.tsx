@@ -58,7 +58,7 @@ const navItems = [
 ]
 
 const aboutNav = [
-  { id: 'about' as const, label: '关于开发者', note: '谁在做知弧', icon: HeartHandshake },
+  { id: 'about' as const, label: '关于开发者', note: '谁在做问渠', icon: HeartHandshake },
   { id: 'donate' as const, label: '打赏开发者', note: '自愿支持', icon: HandCoins },
   { id: 'custom' as const, label: '功能共建', note: '定制与建议', icon: MessagesSquare },
 ]
@@ -424,9 +424,9 @@ export default function App() {
             onClick={() => navigate('tutor')}
             aria-label="回到答疑首页"
           >
-            <span className="brand-mark">知</span>
+            <span className="brand-mark">渠</span>
             <span className="brand-words">
-              <strong>知弧</strong>
+              <strong>问渠</strong>
               <small>高中理科答疑</small>
             </span>
           </button>
@@ -547,7 +547,7 @@ export default function App() {
             <Menu size={20} />
           </button>
           <button type="button" className="mobile-brand" onClick={() => navigate('tutor')}>
-            知弧
+            问渠
           </button>
           <button
             type="button"

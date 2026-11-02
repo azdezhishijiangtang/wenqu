@@ -9,7 +9,9 @@
  */
 import type { ApiSettings, ChatMessage, Mistake, Task } from '../types'
 
-export const BACKUP_APP = 'zhihu-study'
+export const BACKUP_APP = 'wenqu'
+/** 改名前导出的备份仍然允许导入，避免把旧数据锁死。 */
+const LEGACY_BACKUP_APPS = ['zhihu-study']
 export const BACKUP_VERSION = 1
 /** 单个备份文件的体积上限，避免误选超大文件把浏览器卡死。 */
 export const MAX_BACKUP_BYTES = 12 * 1024 * 1024
@@ -95,7 +97,7 @@ export function serializeBackup(file: BackupFile): string {
 export function backupFileName(now = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, '0')
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
-  return `知弧备份-${stamp}.json`
+  return `问渠备份-${stamp}.json`
 }
 
 function validateSettings(value: unknown): ApiSettings | null {
@@ -194,7 +196,7 @@ function validateTasks(value: unknown): Task[] {
  */
 export function parseBackup(text: string): BackupFile {
   if (typeof text !== 'string' || !text.trim()) throw new BackupError('文件是空的，或者没有读到内容')
-  if (new TextEncoder().encode(text).length > MAX_BACKUP_BYTES) throw new BackupError('文件超过 12 MB，可能不是知弧的备份')
+  if (new TextEncoder().encode(text).length > MAX_BACKUP_BYTES) throw new BackupError('文件超过 12 MB，可能不是问渠的备份')
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -202,7 +204,9 @@ export function parseBackup(text: string): BackupFile {
     throw new BackupError('这不是有效的 JSON 文件，可能选错了文件')
   }
   if (!isObject(raw)) throw new BackupError('备份文件结构不正确')
-  if (raw.app !== BACKUP_APP) throw new BackupError('这个文件不是知弧导出的备份')
+  if (raw.app !== BACKUP_APP && !LEGACY_BACKUP_APPS.includes(String(raw.app))) {
+    throw new BackupError('这个文件不是问渠导出的备份')
+  }
   if (raw.version !== BACKUP_VERSION) throw new BackupError(`备份版本是 ${String(raw.version)}，当前只支持版本 ${BACKUP_VERSION}`)
   if (!isObject(raw.data)) throw new BackupError('备份里没有数据部分')
 

@@ -1,4 +1,4 @@
-# 知弧 · 高中理科学习工作台
+# 问渠 · 高中理科学习工作台
 
 面向高中生的数学、物理、化学、生物 AI 答疑与学习网站。解题 API Key 只保存在浏览器本地；图像理解由网站自带的云端服务提供，所有设备可用。
 
@@ -66,7 +66,7 @@ npm run build      # 生产构建到 dist/
 
 ### 导出 / 导入
 
-点击「账号与数据 → 导出这台设备的数据」会下载 `知弧备份-YYYYMMDD-HHmm.json`，包含对话记录、错题本、学习计划、科目/模式与 AI 设置。
+点击「账号与数据 → 导出这台设备的数据」会下载 `问渠备份-YYYYMMDD-HHmm.json`，包含对话记录、错题本、学习计划、科目/模式与 AI 设置。
 
 - 默认 **不含 API Key**，勾选后才写入；可选是否包含题目图片（体积会明显变大）。
 - 在另一浏览器登录同一识图账号后，用「从备份导入」选择该文件：先整份校验，任何一个字段不合格就完全不写入。
@@ -126,7 +126,7 @@ npm run vision:deploy
 仓库已包含 `.github/workflows/deploy.yml`。推送到 `main` 后：
 
 1. GitHub 仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
-2. Actions 会自动构建并部署，地址为 `https://<用户名>.github.io/zhihu-study/`。
+2. Actions 会自动构建并部署，地址为 `https://<用户名>.github.io/wenqu/`。
 
 构建时通过环境变量 `GITHUB_PAGES=true` 切换资源路径前缀（见 `vite.config.ts`）。
 

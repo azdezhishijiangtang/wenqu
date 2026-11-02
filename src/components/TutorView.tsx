@@ -292,7 +292,7 @@ export function TutorView({
                       {message.role === 'assistant' ? (
                         <>
                           <div className="message-meta">
-                            <span>知弧老师</span>
+                            <span>问渠老师</span>
                             {message.subject && (
                               <span className="meta-subject">
                                 {subjectLabel(message.subject)}

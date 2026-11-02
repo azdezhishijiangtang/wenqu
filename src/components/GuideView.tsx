@@ -18,7 +18,7 @@ export function GuideView({ onOpenSettings, onOpenAccount, onOpenTutor }: Props)
       <header className="page-head">
         <div>
           <p className="eyebrow">使用说明</p>
-          <h1>知弧怎么用</h1>
+          <h1>问渠怎么用</h1>
           <p className="page-sub">三分钟上手，把四科答疑、错题本、学习计划和无障碍识图串起来。</p>
         </div>
       </header>

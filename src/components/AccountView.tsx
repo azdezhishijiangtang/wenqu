@@ -95,7 +95,7 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
       const text = await file.text()
       setPreview(parseBackup(text))
     } catch (caught) {
-      setImportError(caught instanceof BackupError ? caught.message : '读取失败，请确认文件是知弧导出的 JSON 备份。')
+      setImportError(caught instanceof BackupError ? caught.message : '读取失败，请确认文件是问渠导出的 JSON 备份。')
     }
   }
 

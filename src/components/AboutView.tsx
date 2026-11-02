@@ -29,7 +29,7 @@ export function AboutView({ onOpenDonate, onOpenCustom }: Props) {
       <header className="page-head">
         <p className="eyebrow">ABOUT THE DEVELOPER</p>
         <h1>关于开发者</h1>
-        <p className="page-sub">知弧是谁做的，为什么做，以及你可以怎么参与。</p>
+        <p className="page-sub">问渠是谁做的，为什么做，以及你可以怎么参与。</p>
       </header>
 
       <section className="dev-card">
@@ -41,7 +41,7 @@ export function AboutView({ onOpenDonate, onOpenCustom }: Props) {
           <p className="dev-role">B 站 UP 主 · 数理知识科普与讲解创作者</p>
           <p>
             大家好，我是 B 站 UP 主<strong>「阿z的知识讲堂」</strong>，一个热爱数学、物理与 AI
-            的创作者。知弧是我把课堂讲解继续往前推的一步——不满足于「讲一遍」，而是希望你带着自己的题来，
+            的创作者。问渠是我把课堂讲解继续往前推的一步——不满足于「讲一遍」，而是希望你带着自己的题来，
             随时问、随时有人接住。
           </p>
           <p>
