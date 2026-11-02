@@ -5,3 +5,4 @@ node_modules
 public/ocr/
 
 HANDOFF.md
+cloudflare/dist/

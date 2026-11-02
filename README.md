@@ -55,14 +55,34 @@ npm run build      # 生产构建到 dist/
 
 账号只用于计数：用户名 + 密码（PBKDF2 加盐，迭代 30000 次以适配免费版 10ms CPU 限制），服务端只保存密码哈希、盐和当天的识别张数，不保存聊天内容或图片。图片只在本次请求中传给视觉模型。
 
-### 部署（手机也能完成）
+### 部署（手机也能完成，不需要电脑）
+
+**方式一：GitHub Actions 自动部署（推荐，点几下即可）**
+
+1. 在 GitHub 仓库 **Settings → Secrets and variables → Actions** 添加两个仓库密钥：
+   - `CLOUDFLARE_API_TOKEN`：在 [Cloudflare API 令牌](https://dash.cloudflare.com/profile/api-tokens) 用「Edit Cloudflare Workers」模板创建，再加一条 D1 的 Edit 权限。
+   - `CLOUDFLARE_ACCOUNT_ID`：在 Cloudflare 控制台右下角或 URL 里能看到。
+2. 推送后 **Actions → Deploy vision worker** 会自动建数据库、建表、生成签名密钥并部署。
+3. 运行日志最后一行会给出 `https://zhihu-study-vision.<子域>.workers.dev`，把它填进 `public/vision-config.json` 的 `apiBase` 并提交，网页就能用了。
+
+重复运行是安全的：数据库已存在就复用，签名密钥已存在就不覆盖（否则所有人会被登出）。
+
+**方式二：控制台粘贴单文件（完全不用命令行）**
+
+1. 本地执行 `npm run vision:bundle`，得到 `cloudflare/dist/worker.js`（约 16 KB，无外部依赖）。
+2. Cloudflare 控制台 **Storage & Databases → D1** 新建 `zhihu-study`，进入该库的 Console，粘贴 `cloudflare/schema.sql` 的内容并执行。
+3. **Workers & Pages → Create → Worker**，把 `worker.js` 全文粘进编辑器并部署。
+4. 在该 Worker 的 **Settings → Bindings** 添加：D1 绑定（变量名 `DB`，选 `zhihu-study`）、Workers AI 绑定（变量名 `AI`）；**Settings → Variables** 添加加密变量 `AUTH_SECRET`（随便一段长随机字符串）。
+5. 把 Worker 地址写进 `public/vision-config.json`。
+
+**方式三：命令行**
 
 ```bash
-npx wrangler login                       # 浏览器里点一次授权
-npx wrangler d1 create zhihu-study       # 把返回的 database_id 填进 cloudflare/wrangler.toml
+npx wrangler login
+npx wrangler d1 create zhihu-study        # 把返回的 database_id 填进 cloudflare/wrangler.toml
 npx wrangler d1 execute zhihu-study --remote --file=cloudflare/schema.sql
-npx wrangler secret put AUTH_SECRET --config cloudflare/wrangler.toml   # 随便填一段长随机字符串
-npm run vision:deploy                    # 部署 Worker
+npx wrangler secret put AUTH_SECRET --config cloudflare/wrangler.toml
+npm run vision:deploy
 ```
 
 部署完成后把 Worker 地址写进 `public/vision-config.json` 的 `apiBase`（例如 `https://zhihu-study-vision.<子域>.workers.dev`），提交后 GitHub Pages 会自动重建。也可以构建时用 `VITE_VISION_API_URL` 指定同一个地址。

@@ -11,7 +11,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test:vision": "node --test cloudflare/test/core.test.mjs cloudflare/test/api.test.ts",
-    "vision:deploy": "wrangler deploy --config cloudflare/wrangler.toml"
+    "vision:deploy": "wrangler deploy --config cloudflare/wrangler.toml",
+    "vision:bundle": "node cloudflare/build.mjs"
   },
   "dependencies": {
     "@tesseract.js-data/chi_sim": "^1.0.0",
@@ -31,6 +32,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "esbuild": "^0.28.2",
     "oxlint": "^1.89.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.5"
