@@ -1,4 +1,4 @@
-export type View = 'tutor' | 'formulas' | 'mistakes' | 'plan'
+export type View = 'tutor' | 'formulas' | 'mistakes' | 'plan' | 'account' | 'guide'
 
 export type Subject = 'math' | 'physics' | 'chemistry' | 'biology'
 export type SubjectFilter = 'all' | Subject

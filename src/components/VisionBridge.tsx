@@ -1,17 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Worker } from 'tesseract.js'
 import { Modal } from './Modal'
-import {
-  VisionError,
-  loadAccount,
-  login as loginRequest,
-  me as meRequest,
-  readImages,
-  register as registerRequest,
-  saveAccount,
-  type VisionAccount,
-  type VisionQuota,
-} from '../lib/visionApi'
+import { VisionError, readImages } from '../lib/visionApi'
+import { useVisionAccount } from '../hooks/useVisionAccount'
 
 interface Props { images: string[]; question: string; onClose: () => void; onConfirm: (text: string) => void }
 const templates: Record<string, string> = {
@@ -32,13 +23,11 @@ export function VisionBridge({ images, question, onClose, onConfirm }: Props) {
   const [engine, setEngine] = useState<'ocr' | 'cloud'>('ocr')
   const [source, setSource] = useState<'ocr' | 'cloud'>('ocr')
 
-  const [account, setAccount] = useState<VisionAccount | null>(() => loadAccount())
-  const [quota, setQuota] = useState<VisionQuota | null>(() => loadAccount()?.quota ?? null)
+  const vision = useVisionAccount()
+  const { account, quota } = vision
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [authBusy, setAuthBusy] = useState(false)
-  const [authError, setAuthError] = useState('')
 
   const request = useRef<AbortController | null>(null)
   const worker = useRef<Worker | null>(null)
@@ -57,55 +46,12 @@ export function VisionBridge({ images, question, onClose, onConfirm }: Props) {
   useEffect(() => () => { stopWorker() }, [])
 
   // 打开面板时刷新一次剩余次数，换设备登录也能看到最新额度。
-  useEffect(() => {
-    const saved = loadAccount()
-    if (!saved) return
-    let alive = true
-    meRequest(saved.token)
-      .then((data) => {
-        if (!alive) return
-        setQuota(data.quota)
-        saveAccount({ ...saved, quota: data.quota })
-      })
-      .catch((caught: unknown) => {
-        if (!alive) return
-        if (caught instanceof VisionError && caught.status === 401) {
-          saveAccount(null)
-          setAccount(null)
-          setQuota(null)
-        }
-      })
-    return () => { alive = false }
-  }, [])
+  const refreshAccount = vision.refresh
+  useEffect(() => { void refreshAccount() }, [refreshAccount])
 
   async function submitAuth() {
-    setAuthError('')
-    if (!username.trim() || password.length < 8) {
-      setAuthError('用户名至少 3 位；密码至少 8 位。')
-      return
-    }
-    setAuthBusy(true)
-    try {
-      const result = authMode === 'login'
-        ? await loginRequest(username.trim(), password)
-        : await registerRequest(username.trim(), password)
-      saveAccount(result)
-      setAccount(result)
-      setQuota(result.quota)
-      setPassword('')
-      setStatus(`已登录 ${result.user.username}，今天还可识别 ${result.quota.remaining} 张。`)
-    } catch (caught) {
-      setAuthError(caught instanceof Error ? caught.message : '登录失败，请重试。')
-    } finally {
-      setAuthBusy(false)
-    }
-  }
-
-  function signOut() {
-    saveAccount(null)
-    setAccount(null)
-    setQuota(null)
-    setStatus('已退出识图账号。')
+    const result = await vision.submit(authMode, username, password)
+    if (result) setPassword('')
   }
 
   async function recognizeCloud() {
@@ -129,18 +75,12 @@ export function VisionBridge({ images, question, onClose, onConfirm }: Props) {
       if (id !== run.current) return
       setText(data.evidence.join('\n\n'))
       setSource('cloud')
-      setQuota(data.quota)
-      saveAccount({ ...account, quota: data.quota })
+      vision.applyQuota(data.quota)
       setStatus(`识别完成，今天还剩 ${data.quota.remaining} 次。请核对数字、箭头和不确定项。`)
     } catch (caught) {
       if (id !== run.current) return
-      if (caught instanceof VisionError && caught.quota) {
-        setQuota(caught.quota)
-        saveAccount({ ...account, quota: caught.quota })
-      }
-      if (caught instanceof VisionError && caught.status === 401) {
-        saveAccount(null); setAccount(null); setQuota(null)
-      }
+      if (caught instanceof VisionError && caught.quota) vision.applyQuota(caught.quota)
+      if (caught instanceof VisionError && caught.status === 401) vision.signOut()
       setError(controller.signal.aborted ? '识图超时或已取消，本次没有扣次数。' : (caught instanceof Error ? caught.message : '云端识图失败。'))
     } finally {
       if (id === run.current) { clearTimeout(timer.current); request.current = null; setBusy(false) }
@@ -208,10 +148,10 @@ export function VisionBridge({ images, question, onClose, onConfirm }: Props) {
     <p className="vision-auth-hint">云端识图按账号计算次数，每天 {quota?.limit ?? 3} 次，换设备登录也沿用同一份额度。账号仅用于计数，不保存你的聊天内容。</p>
     <label className="field"><span>用户名</span><input value={username} autoComplete="username" onChange={e => setUsername(e.target.value)} placeholder="3–24 位，可用中文、字母、数字、下划线" /></label>
     <label className="field"><span>密码</span><input type="password" value={password} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} onChange={e => setPassword(e.target.value)} placeholder="至少 8 位" /></label>
-    {authError && <p role="alert" className="image-error">{authError}</p>}
+    {vision.error && <p role="alert" className="image-error">{vision.error}</p>}
     <div className="vision-auth-actions">
-      <button className="secondary-button" disabled={authBusy} onClick={submitAuth}>{authBusy ? '请稍候…' : authMode === 'login' ? '登录' : '注册并登录'}</button>
-      <button className="text-button" disabled={authBusy} onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError('') }}>{authMode === 'login' ? '没有账号？注册' : '已有账号？登录'}</button>
+      <button className="secondary-button" disabled={vision.busy} onClick={submitAuth}>{vision.busy ? '请稍候…' : authMode === 'login' ? '登录' : '注册并登录'}</button>
+      <button className="text-button" disabled={vision.busy} onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); vision.setError('') }}>{authMode === 'login' ? '没有账号？注册' : '已有账号？登录'}</button>
     </div>
   </div>
 
@@ -233,7 +173,7 @@ export function VisionBridge({ images, question, onClose, onConfirm }: Props) {
         {needMore && <p className="image-error">剩余次数不足本次需要的 {images.length} 次，请先删掉多余图片或明天再试。</p>}
         <div className="vision-auth-actions">
           <button className="secondary-button" disabled={busy} onClick={recognizeCloud}>识别这 {images.length} 张（消耗 {images.length} 次）</button>
-          <button className="text-button" disabled={busy} onClick={signOut}>退出账号</button>
+          <button className="text-button" disabled={busy} onClick={vision.signOut}>退出账号</button>
         </div>
       </>}
     </>}

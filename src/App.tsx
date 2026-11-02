@@ -1,6 +1,7 @@
 import {
   Atom,
   BookMarked,
+  BookOpen,
   CalendarDays,
   Check,
   FlaskConical,
@@ -10,11 +11,14 @@ import {
   NotebookPen,
   Settings2,
   Sparkles,
+  UserRound,
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
+import { AccountView } from './components/AccountView'
 import { FormulaView as Formulas } from './components/FormulaView'
+import { GuideView } from './components/GuideView'
 import { MistakeForm } from './components/MistakeForm'
 import { MistakesView as Mistakes } from './components/MistakesView'
 import { PlanView } from './components/PlanView'
@@ -43,6 +47,8 @@ const navItems = [
   { id: 'formulas' as const, label: '知识手册', note: '四科速查', icon: BookMarked },
   { id: 'mistakes' as const, label: '错题本', note: '错因与复盘', icon: NotebookPen },
   { id: 'plan' as const, label: '学习计划', note: '专注与节奏', icon: CalendarDays },
+  { id: 'account' as const, label: '账号与数据', note: '登录 · 备份', icon: UserRound },
+  { id: 'guide' as const, label: '使用说明', note: '三分钟上手', icon: BookOpen },
 ]
 
 const subjectMeta: Record<Subject, { label: string; icon: typeof Atom }> = {
@@ -599,6 +605,29 @@ export default function App() {
                 onDelete={(id) =>
                   setTasks((current) => current.filter((task) => task.id !== id))
                 }
+              />
+            )}
+            {view === 'account' && (
+              <AccountView
+                snapshot={{ settings, messages, subject, mode, mistakes, tasks }}
+                onOpenGuide={() => setView('guide')}
+                onImport={(next) => {
+                  if (next.settings) setSettings({ ...defaultSettings(), ...next.settings })
+                  setMessages(next.messages)
+                  setMistakes(next.mistakes)
+                  setTasks(next.tasks)
+                  setSubject(next.subject as SubjectFilter)
+                  setMode(next.mode as TutorMode)
+                  setInput('')
+                  setError('')
+                }}
+              />
+            )}
+            {view === 'guide' && (
+              <GuideView
+                onOpenSettings={() => setSettingsOpen(true)}
+                onOpenAccount={() => setView('account')}
+                onOpenTutor={() => navigate('tutor')}
               />
             )}
           </div>
