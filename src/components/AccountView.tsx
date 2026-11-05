@@ -45,7 +45,7 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
-  const [includeApiKey, setIncludeApiKey] = useState(false)
+  const includeApiKey = false // 安全策略：备份永远不含密钥，导出选项已强制禁用
   const [includeImages, setIncludeImages] = useState(false)
   const [exportNotice, setExportNotice] = useState('')
 
@@ -82,7 +82,7 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
     setExportNotice(
       `已导出 ${file.stats.messages} 条对话、${file.stats.mistakes} 道错题、${file.stats.tasks} 项任务`
       + `${includeImages ? `、${file.stats.images} 张图片` : '（不含图片）'}`
-      + `${includeApiKey ? '，包含 API Key' : '，不含 API Key'}。`,
+      + '，不含 API Key（安全策略已强制移除导出密钥选项）。',
     )
   }
 
@@ -194,9 +194,9 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
           <input type="checkbox" checked={includeImages} onChange={(event) => setIncludeImages(event.target.checked)} />
           <span>包含题目图片（文件会大很多，但导入后原图还在）</span>
         </label>
-        <label className="check-row">
-          <input type="checkbox" checked={includeApiKey} onChange={(event) => setIncludeApiKey(event.target.checked)} />
-          <span>包含 API Key（<strong>只导入回自己的设备才勾选</strong>，发给别人等于泄露密钥）</span>
+        <label className="check-row" style={{ opacity: 0.6 }}>
+          <input type="checkbox" checked={false} disabled />
+          <span>包含 API Key（<strong>已由安全策略强制禁用</strong>：密钥不再写入磁盘，备份一律不含密钥）</span>
         </label>
         <p className="account-hint">预计文件大小约 {formatBytes(currentSize)}。</p>
         <button className="primary-button" onClick={exportNow}><Download size={16} /> 下载备份文件</button>
@@ -227,7 +227,6 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
             <p className="account-hint">
               导出时间：{preview.exportedAt ? new Date(preview.exportedAt).toLocaleString() : '未记录'}
               {preview.account ? ` · 导出账号：${preview.account}` : ''}
-              {preview.data.settings?.apiKey ? ' · 含 API Key' : ''}
             </p>
             <fieldset className="import-strategy">
               <legend>导入方式</legend>

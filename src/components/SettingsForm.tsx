@@ -11,8 +11,9 @@ import {
   SquareTerminal,
   X,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { testConnection } from '../lib/ai'
+import { vault } from '../lib/byokVault'
 import type { TestResult } from '../lib/ai'
 import type { ApiSettings } from '../types'
 
@@ -79,6 +80,11 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const baseUrlRef = useRef<HTMLInputElement>(null)
+  const vaultHostRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!vaultHostRef.current) return
+    return vault.mountVaultControls(vaultHostRef.current)
+  }, [])
 
   function patch(next: Partial<ApiSettings>) {
     setDraft((current) => ({ ...current, ...next }))
@@ -106,17 +112,29 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
   }
 
   async function runTest() {
+    const typed = draft.apiKey.trim()
+    if (typed && !vault.isHandle(typed)) vault.set('default', typed)
+    const probe = {
+      ...draft,
+      apiKey: typed ? (vault.isHandle(typed) ? typed : vault.handleFor('default')) : settings.apiKey,
+    }
     setTesting(true)
     setTestResult(null)
-    const result = await testConnection(draft)
+    const result = await testConnection(probe)
     setTestResult(result)
     setTesting(false)
   }
 
   function handleSave() {
+    const typed = draft.apiKey.trim()
+    let handle = settings.apiKey
+    if (typed && !vault.isHandle(typed)) {
+      vault.set('default', typed)
+      handle = vault.handleFor('default')
+    }
     onSave({
       ...draft,
-      apiKey: draft.apiKey.trim(),
+      apiKey: handle,
       baseUrl: draft.baseUrl.trim(),
       model: draft.model.trim(),
     })
@@ -131,10 +149,12 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
       <div className="settings-note">
         <ShieldCheck size={17} />
         <p>
-          密钥仅保存在当前浏览器的本地存储中，由浏览器直接发送给你填写的接口，不会经过任何中间服务器。
-          共用设备请在使用后点「清除密钥」。
+          <strong>密钥默认不写入磁盘</strong>：只存在于当前页面的内存中，刷新或关闭即消失。
+          浏览器仍会直连你填写的接口，不经过任何中间服务器。若希望刷新后免于重输，可在下方设置口令，把密钥加密暂存于本标签页（关闭标签页即失效）。
+          建议使用「额度受限、可随时撤销」的专用子密钥，不要填主账号密钥。
         </p>
       </div>
+      <div ref={vaultHostRef} />
 
       <div className="field">
         <span>服务商预设</span>
@@ -186,9 +206,9 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
           <KeyRound size={16} />
           <input
             type={showKey ? 'text' : 'password'}
-            value={draft.apiKey}
+            value={vault.isHandle(draft.apiKey) ? '' : draft.apiKey}
             onChange={(event) => patch({ apiKey: event.target.value })}
-            placeholder="sk-..."
+            placeholder={settings.apiKey ? '已配置 · 留空保持不变，或粘贴新密钥替换' : 'sk-…'}
             autoComplete="off"
             spellCheck={false}
           />
@@ -318,6 +338,7 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
             type="button"
             className="text-button danger"
             onClick={() => {
+              vault.purge()
               patch({ apiKey: '' })
               onSave({ ...settings, apiKey: '' })
             }}

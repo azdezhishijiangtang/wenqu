@@ -2,7 +2,7 @@
  * 账号数据导出 / 导入。
  *
  * 设计原则：
- * - 导出文件默认不含 API Key（除非用户主动勾选），避免把密钥发给别人。
+ * - 导出文件永远不含 API Key：includeApiKey 选项已废弃并强制忽略，避免把密钥发给别人。
  * - 导入必须先整体校验，任何字段不合格就整体拒绝，绝不写半份数据。
  * - 文件里记录导出时的账号名，换账号导入时给出提醒但不阻断。
  * - 纯函数，便于测试；不直接读写 localStorage。
@@ -36,6 +36,7 @@ export interface BackupFile {
 
 export interface BuildOptions {
   account?: string | null
+  /** @deprecated 安全策略：备份永远不含密钥，本选项保留仅为兼容调用方，已被强制忽略 */
   includeApiKey?: boolean
   includeImages?: boolean
   now?: Date
@@ -58,9 +59,9 @@ function countImages(messages: ChatMessage[]): number {
 
 /** 去掉密钥与图片后生成可分享的备份对象。 */
 export function buildBackup(snapshot: BackupSnapshot, options: BuildOptions = {}): BackupFile {
-  const { account = null, includeApiKey = false, includeImages = true, now = new Date() } = options
+  const { account = null, includeImages = true, now = new Date() } = options
   const settings = snapshot.settings
-    ? { ...snapshot.settings, ...(includeApiKey ? {} : { apiKey: '' }) }
+    ? { ...snapshot.settings, apiKey: '' }
     : null
   const messages = snapshot.messages.map((message) => {
     if (includeImages) return { ...message }
@@ -109,7 +110,7 @@ function validateSettings(value: unknown): ApiSettings | null {
   return {
     baseUrl: text('baseUrl'),
     model: text('model'),
-    apiKey: text('apiKey'),
+    apiKey: '',
     maxTokens: text('maxTokens'),
     temperature: text('temperature'),
     reasoning: reasoning === 'low' || reasoning === 'medium' || reasoning === 'high' ? reasoning : 'off',

@@ -1,4 +1,5 @@
 import type { ApiSettings, Subject, TutorMode } from '../types'
+import { vault } from './byokVault'
 
 /* ------------------------------------------------------------------ */
 /* 提示词系统：通用原则 + 四科专属 + 三种模式                            */
@@ -266,17 +267,17 @@ export async function streamChat({
   onContent,
   onReasoning,
 }: ChatRequest): Promise<void> {
-  if (!settings.apiKey.trim()) {
-    throw new Error('尚未配置 API Key。请点右上角「API 设置」填写密钥。')
+  if (!vault.isHandle(settings.apiKey) || !vault.has(settings.apiKey)) {
+    throw new Error('尚未配置或密钥已锁定。请在「API 设置」里输入 API Key，或输入解锁口令。')
   }
 
   let response: Response
   try {
-    response = await fetch(normalizeBaseUrl(settings.baseUrl), {
+    response = await vault.secureFetch(normalizeBaseUrl(settings.baseUrl), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.apiKey.trim()}`,
+        Authorization: vault.authHeaders(settings.apiKey).Authorization,
       },
       body: JSON.stringify(
         buildRequestBody(settings, [
@@ -378,17 +379,17 @@ export interface TestResult {
 }
 
 export async function testConnection(settings: ApiSettings): Promise<TestResult> {
-  if (!settings.apiKey.trim()) {
-    return { ok: false, message: '请先填写 API Key。' }
+  if (!vault.isHandle(settings.apiKey) || !vault.has(settings.apiKey)) {
+    return { ok: false, message: '请先填写 API Key，或输入解锁口令。' }
   }
 
   const started = performance.now()
   try {
-    const response = await fetch(normalizeBaseUrl(settings.baseUrl), {
+    const response = await vault.secureFetch(normalizeBaseUrl(settings.baseUrl), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.apiKey.trim()}`,
+        Authorization: vault.authHeaders(settings.apiKey).Authorization,
       },
       body: JSON.stringify(
         buildRequestBody(

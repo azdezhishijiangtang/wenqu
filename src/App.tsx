@@ -32,6 +32,7 @@ import { SettingsForm } from './components/SettingsForm'
 import { TutorView } from './components/TutorView'
 import { VisionBridge } from './components/VisionBridge'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import { vault } from './lib/byokVault'
 import { defaultSettings, streamChat } from './lib/ai'
 import { compressImageFile, MAX_IMAGES } from './lib/image'
 import { ThinkSplitter } from './lib/think'
@@ -271,7 +272,7 @@ export default function App() {
     const text = (textOverride ?? input).trim()
     const hasImages = pendingImages.length > 0
     if ((!text && !hasImages) || loading) return
-    if (!settings.apiKey.trim()) {
+    if (!vault.isHandle(settings.apiKey) || !vault.has(settings.apiKey)) {
       setInput(text)
       setError('')
       setSettingsOpen(true)
@@ -528,11 +529,11 @@ export default function App() {
             </span>
             <span className="api-status-copy">
               <strong>{settings.apiKey ? 'AI 通道已配置' : '连接你的 AI'}</strong>
-              <small>{settings.apiKey ? settings.model || '未填写模型' : '在本地保存 API Key'}</small>
+              <small>{settings.apiKey ? settings.model || '未填写模型' : '密钥仅存内存 · 不落盘'}</small>
             </span>
             <Settings2 size={15} className="api-gear" />
           </button>
-          <p className="local-note">密钥仅存储在当前浏览器</p>
+          <p className="local-note">密钥仅存内存 · 不写入磁盘</p>
         </div>
       </aside>
 
