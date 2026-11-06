@@ -3,7 +3,7 @@ export type View =
   | 'formulas'
   | 'mistakes'
   | 'plan'
-  | 'account'
+  | 'data'
   | 'guide'
   | 'about'
   | 'donate'

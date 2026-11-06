@@ -4,7 +4,6 @@
  * 设计原则：
  * - 导出文件永远不含 API Key：includeApiKey 选项已废弃并强制忽略，避免把密钥发给别人。
  * - 导入必须先整体校验，任何字段不合格就整体拒绝，绝不写半份数据。
- * - 文件里记录导出时的账号名，换账号导入时给出提醒但不阻断。
  * - 纯函数，便于测试；不直接读写 localStorage。
  */
 import type { ApiSettings, ChatMessage, Mistake, Task } from '../types'
@@ -29,13 +28,11 @@ export interface BackupFile {
   app: string
   version: number
   exportedAt: string
-  account: string | null
   data: BackupSnapshot
   stats: { messages: number; mistakes: number; tasks: number; images: number }
 }
 
 export interface BuildOptions {
-  account?: string | null
   /** @deprecated 安全策略：备份永远不含密钥，本选项保留仅为兼容调用方，已被强制忽略 */
   includeApiKey?: boolean
   includeImages?: boolean
@@ -59,7 +56,7 @@ function countImages(messages: ChatMessage[]): number {
 
 /** 去掉密钥与图片后生成可分享的备份对象。 */
 export function buildBackup(snapshot: BackupSnapshot, options: BuildOptions = {}): BackupFile {
-  const { account = null, includeImages = true, now = new Date() } = options
+  const { includeImages = true, now = new Date() } = options
   const settings = snapshot.settings
     ? { ...snapshot.settings, apiKey: '' }
     : null
@@ -72,7 +69,6 @@ export function buildBackup(snapshot: BackupSnapshot, options: BuildOptions = {}
     app: BACKUP_APP,
     version: BACKUP_VERSION,
     exportedAt: now.toISOString(),
-    account,
     data: {
       settings,
       messages,
@@ -227,7 +223,6 @@ export function parseBackup(text: string): BackupFile {
     app: BACKUP_APP,
     version: BACKUP_VERSION,
     exportedAt: typeof raw.exportedAt === 'string' ? raw.exportedAt : '',
-    account: typeof raw.account === 'string' ? raw.account : null,
     data: snapshot,
     stats: {
       messages: snapshot.messages.length,

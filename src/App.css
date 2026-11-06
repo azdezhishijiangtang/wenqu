@@ -7,11 +7,6 @@
 .ocr-question { white-space: pre-wrap; overflow-wrap: anywhere; }
 .ocr-confirm { display: flex; align-items: flex-start; gap: 10px; margin: 16px 0; cursor: pointer; }
 .ocr-confirm input { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 3px; }
-.vision-auth { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: var(--surface); margin: 12px 0; }
-.vision-auth-title { margin: 0 0 4px; font-weight: 600; }
-.vision-auth-hint { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
-.vision-auth-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
-.vision-quota { background: var(--accent-wash); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
 
 :root {
   --paper: #f5f3ed;

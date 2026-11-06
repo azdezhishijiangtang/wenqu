@@ -1,18 +1,18 @@
-import { BookMarked, CalendarDays, Cloud, Image, KeyRound, NotebookPen, ScanText, Sparkles, UserRound } from 'lucide-react'
+import { BookMarked, CalendarDays, Image, KeyRound, NotebookPen, ScanText, Sparkles } from 'lucide-react'
 
 interface Props {
   onOpenSettings: () => void
-  onOpenAccount: () => void
+  onOpenData: () => void
   onOpenTutor: () => void
 }
 
 const steps = [
   { icon: KeyRound, title: '接上你自己的 AI', body: '点右上角钥匙图标，填 API 地址、模型名和 Key。请求由浏览器直接发给你选的模型服务商，本站不中转、不保存你的密钥。' },
   { icon: Sparkles, title: '开始问题', body: '选科目和模式，把题目贴进来。可以只问一个点，也可以让 AI 完整讲一遍。' },
-  { icon: Image, title: '题目是图片也行', body: '粘贴或上传截图（最多 3 张），网站先帮你把图变成文字，核对后再交给你自己的模型推理。' },
+  { icon: Image, title: '题目是图片也行', body: '粘贴或上传截图（最多 3 张），网站在本机把图变成文字，核对后再交给你自己的模型推理。' },
 ]
 
-export function GuideView({ onOpenSettings, onOpenAccount, onOpenTutor }: Props) {
+export function GuideView({ onOpenSettings, onOpenData, onOpenTutor }: Props) {
   return (
     <div className="guide-page">
       <header className="page-head">
@@ -79,48 +79,24 @@ export function GuideView({ onOpenSettings, onOpenAccount, onOpenTutor }: Props)
       </section>
 
       <section className="guide-section">
-        <h2><Image size={18} /> 图片题怎么看</h2>
-        <p>上传或粘贴截图后，识图面板提供两条路。它们的成本和能力不同，按需选：</p>
-        <div className="guide-compare">
-          <div className="compare-col">
-            <h3><ScanText size={16} /> 本地 OCR</h3>
-            <ul>
-              <li>在你的浏览器里跑开源识别引擎，<strong>不联网识图、不消耗次数</strong></li>
-              <li>适合清晰印刷的题干、数字、选项</li>
-              <li>不认识图形关系：函数曲线走势、电路连接、流程箭头都要你自己补</li>
-              <li>首次使用要下载几 MB 的引擎和字库，手机上会慢一些</li>
-            </ul>
-          </div>
-          <div className="compare-col">
-            <h3><Cloud size={16} /> 云端图形理解</h3>
-            <ul>
-              <li>由本站的识图服务调用视觉模型，能描述坐标轴、曲线趋势、箭头和连接</li>
-              <li><strong>必须登录识图账号</strong>，每个账号每天 3 张</li>
-              <li>会慢一些，通常 7–20 秒</li>
-              <li>模型也会看错，尤其是手写和复杂装置图</li>
-            </ul>
-          </div>
-        </div>
-        <p className="guide-note">
-          两条路最后都要经过「核对」这一步：识别结果会填进文本框，你改掉错字、补充图形关系、
-          勾选确认后，才会发给你的文字模型。主模型始终收不到原图。
-        </p>
+        <h2><ScanText size={18} /> 图片题怎么看</h2>
+        <p>本站是纯前端应用，识图全部在浏览器本机完成：Tesseract.js 提取中英文文字，不需要账号、不上传原图、不消耗任何额度。</p>
+        <ul className="guide-limits">
+          <li>适合清晰印刷的题干、数字和选项；首次使用要下载几 MB 的引擎和字库，手机上会慢一些。</li>
+          <li>OCR 不认识图形关系：函数曲线走势、电路连接、流程箭头都要你用下面的模板自己补。</li>
+          <li>识别结果一定会填进文本框，改掉错字、补充图形关系并勾选确认后，才会发给你的文字模型；主模型始终收不到原图。</li>
+        </ul>
       </section>
 
       <section className="guide-section">
-        <h2><UserRound size={18} /> 账号与换设备</h2>
+        <h2><BookMarked size={18} /> 数据与换设备</h2>
         <p>
-          识图账号用于记录每天用过几次云端识图：注册后用用户名和密码登录，
-          <strong>同一账号在不同设备共享这 3 次额度</strong>，换浏览器、清缓存都不会重置。
-          账号只保存密码哈希和当天的次数，不保存你的聊天、错题或图片。
-        </p>
-        <p>
-          聊天记录、错题本、学习计划存在当前浏览器里。换设备时：
+          聊天记录、错题本、学习计划存在当前浏览器里，本站没有服务器也不设账号。换设备时：
           <strong>旧设备导出 JSON → 传到新设备 → 新设备导入</strong>。
-          导入会先整份校验再写入，可以选择「替换」或「合并」。
+          导入会先整份校验再写入，可以选择「替换」或「合并」；导出文件永远不含 API Key。
         </p>
         <div className="guide-actions">
-          <button className="primary-button" onClick={onOpenAccount}>账号与数据</button>
+          <button className="primary-button" onClick={onOpenData}>数据与备份</button>
         </div>
       </section>
 
@@ -151,9 +127,7 @@ export function GuideView({ onOpenSettings, onOpenAccount, onOpenTutor }: Props)
       <section className="guide-section muted-card">
         <h2>需要知道的限制</h2>
         <ul className="guide-limits">
-          <li>识图结果一定有出错的可能，尤其是手写、上下标、复杂公式和图形空间关系；请把它当作「帮你打字的助手」，不是标准答案。</li>
-          <li>云端识图受免费额度限制，额度用完当天暂停，第二天恢复；不会自动转成付费服务。</li>
-          <li>识图服务用的是 <code>workers.dev</code> 域名，个别网络（尤其是部分国内网络）会连不上或被解析到错误地址。遇到「连不上识图服务」，先用本地 OCR，或者换 Wi-Fi / 移动网络再试。</li>
+          <li>本地 OCR 一定有出错的可能，尤其是手写、上下标和复杂公式；请把它当作「帮你打字的助手」，不是标准答案。</li>
           <li>聊天记录存在浏览器里，清理浏览器数据或换设备不会自动保留，请定期导出备份。</li>
           <li>AI 的解答也可能有错，尤其是计算步骤和边界条件。重要结论请自己验算。</li>
         </ul>

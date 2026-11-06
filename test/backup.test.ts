@@ -38,20 +38,21 @@ const snapshot = {
 const roundTrip = (file) => parseBackup(serializeBackup(file))
 
 test('导出默认不含 API Key，但保留其它设置', () => {
-  const file = buildBackup(snapshot, { account: '小明', includeApiKey: false })
+  const file = buildBackup(snapshot, { includeApiKey: false })
   assert.equal(file.app, BACKUP_APP)
   assert.equal(file.version, BACKUP_VERSION)
-  assert.equal(file.account, '小明')
   assert.equal(file.data.settings.apiKey, '')
   assert.equal(file.data.settings.baseUrl, settings.baseUrl)
   assert.equal(JSON.stringify(file).includes('sk-secret-value'), false)
 })
 
-test('勾选后才写入 API Key，导出内容原样保留', () => {
+test('安全策略：includeApiKey 被强制忽略，导出与导入都不含密钥', () => {
   const file = buildBackup(snapshot, { includeApiKey: true })
-  assert.equal(file.data.settings.apiKey, 'sk-secret-value')
+  // 导出选项已废弃，任何取值都不会把 API Key 写进备份。
+  assert.equal(file.data.settings.apiKey, '')
+  assert.equal(JSON.stringify(file).includes('sk-secret-value'), false)
   const back = roundTrip(file)
-  assert.equal(back.data.settings.apiKey, 'sk-secret-value')
+  assert.equal(back.data.settings.apiKey, '')
   assert.equal(back.data.messages.length, 2)
   assert.equal(back.data.mistakes[0].title, '受力分析')
   assert.equal(back.data.tasks[0].minutes, 30)
@@ -115,7 +116,6 @@ test('缺失的可选字段被安全补全，不会崩溃', () => {
   assert.equal(back.data.messages[0].id, 'imported-0')
   assert.equal(back.data.mistakes.length, 0)
   assert.equal(back.data.tasks.length, 0)
-  assert.equal(back.account, null)
 })
 
 test('非图片的 images 内容在导入时被丢弃', () => {

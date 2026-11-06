@@ -20,7 +20,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { AboutView } from './components/AboutView'
-import { AccountView } from './components/AccountView'
+import { DataView } from './components/DataView'
 import { CustomView } from './components/CustomView'
 import { DonateView } from './components/DonateView'
 import { FormulaView as Formulas } from './components/FormulaView'
@@ -54,7 +54,7 @@ const navItems = [
   { id: 'formulas' as const, label: '知识手册', note: '四科速查', icon: BookMarked },
   { id: 'mistakes' as const, label: '错题本', note: '错因与复盘', icon: NotebookPen },
   { id: 'plan' as const, label: '学习计划', note: '专注与节奏', icon: CalendarDays },
-  { id: 'account' as const, label: '账号与数据', note: '登录 · 备份', icon: UserRound },
+  { id: 'data' as const, label: '数据与备份', note: '导出 · 导入', icon: UserRound },
   { id: 'guide' as const, label: '使用说明', note: '三分钟上手', icon: BookOpen },
 ]
 
@@ -644,8 +644,8 @@ export default function App() {
                 }
               />
             )}
-            {view === 'account' && (
-              <AccountView
+            {view === 'data' && (
+              <DataView
                 snapshot={{ settings, messages, subject, mode, mistakes, tasks }}
                 onOpenGuide={() => setView('guide')}
                 onImport={(next) => {
@@ -663,7 +663,7 @@ export default function App() {
             {view === 'guide' && (
               <GuideView
                 onOpenSettings={() => setSettingsOpen(true)}
-                onOpenAccount={() => setView('account')}
+                onOpenData={() => setView('data')}
                 onOpenTutor={() => navigate('tutor')}
               />
             )}

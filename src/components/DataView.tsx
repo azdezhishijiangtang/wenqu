@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, Download, LogIn, LogOut, Upload, UserRound } from 'lucide-react'
-import { useVisionAccount } from '../hooks/useVisionAccount'
-import { isReachable } from '../lib/visionApi'
+import { useMemo, useRef, useState } from 'react'
+import { AlertTriangle, Check, Download, Upload } from 'lucide-react'
 import {
   BackupError,
   backupFileName,
@@ -39,12 +37,11 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`
 }
 
-export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
-  const vision = useVisionAccount()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-
+/**
+ * 数据与备份：本站是纯前端应用，所有数据只存在这台设备的浏览器里。
+ * 提供 JSON 导出 / 导入，用于换设备或清理浏览器数据前搬运。
+ */
+export function DataView({ snapshot, onImport, onOpenGuide }: Props) {
   const includeApiKey = false // 安全策略：备份永远不含密钥，导出选项已强制禁用
   const [includeImages, setIncludeImages] = useState(false)
   const [exportNotice, setExportNotice] = useState('')
@@ -54,29 +51,17 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
   const [strategy, setStrategy] = useState<ImportStrategy>('replace')
   const [importError, setImportError] = useState('')
   const [imported, setImported] = useState('')
-  // null = 还在检测；false 时在账号区提示网络不通，建议用本地 OCR。
-  const [reachable, setReachable] = useState<boolean | null>(null)
-  useEffect(() => {
-    let alive = true
-    void isReachable().then((ok) => { if (alive) setReachable(ok) })
-    return () => { alive = false }
-  }, [])
 
   const currentSize = useMemo(
     () => new TextEncoder().encode(serializeBackup(buildBackup(snapshot, {
-      account: vision.account?.user.username ?? null,
       includeApiKey,
       includeImages,
     }))).length,
-    [snapshot, vision.account, includeApiKey, includeImages],
+    [snapshot, includeApiKey, includeImages],
   )
 
   function exportNow() {
-    const file = buildBackup(snapshot, {
-      account: vision.account?.user.username ?? null,
-      includeApiKey,
-      includeImages,
-    })
+    const file = buildBackup(snapshot, { includeApiKey, includeImages })
     const text = serializeBackup(file)
     downloadText(backupFileName(), text)
     setExportNotice(
@@ -116,73 +101,15 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
     <div className="account-page">
       <header className="page-head">
         <div>
-          <p className="eyebrow">账号与数据</p>
-          <h1>一处登录，换设备接着用</h1>
+          <p className="eyebrow">数据与备份</p>
+          <h1>把学习数据带在身边</h1>
           <p className="page-sub">
-            识图账号用于云端限次；聊天、错题、计划可以导出成文件，在新浏览器登录后导入。
+            本站是纯前端应用，对话、错题和计划只存在这台设备的浏览器里，没有服务器替你保管。
+            换设备或清理浏览器数据前，请导出一份 JSON 备份。
             第一次读不懂的地方，可以先看 <button type="button" className="inline-link" onClick={onOpenGuide}>使用说明</button>。
           </p>
         </div>
       </header>
-
-      <section className="account-card">
-        <h2><UserRound size={18} /> 识图账号</h2>
-        {reachable === false && (
-          <p className="form-warn">
-            <AlertTriangle size={14} />
-            当前网络连不上识图服务（部分网络会屏蔽该域名）。登录和云端识图会失败，
-            可以先在答疑页用「本地 OCR」或手工填写继续刷题；换 Wi-Fi / 移动网络后重新打开本页即可。
-          </p>
-        )}
-        {!vision.account ? (
-          <>
-            <p className="account-hint">
-              云端图形理解按账号计次，每天 3 张，换设备或清缓存都不会重置。账号只记录识别次数，
-              不上传你的聊天内容、错题和图片存档。
-            </p>
-            <div className="account-tabs" role="tablist" aria-label="登录或注册">
-              <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); vision.setError('') }}>登录</button>
-              <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); vision.setError('') }}>注册新账号</button>
-            </div>
-            <div className="account-form">
-              <label className="field">
-                <span>用户名</span>
-                <input value={username} autoComplete="username" onChange={(event) => setUsername(event.target.value)} placeholder="3–24 位，中文、字母、数字、下划线" />
-              </label>
-              <label className="field">
-                <span>密码</span>
-                <input type="password" value={password} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} onChange={(event) => setPassword(event.target.value)} placeholder="至少 8 位" />
-              </label>
-              <button className="primary-button" disabled={vision.busy} onClick={async () => {
-                const result = await vision.submit(mode, username, password)
-                if (result) setPassword('')
-              }}>
-                <LogIn size={16} /> {vision.busy ? '请稍候…' : mode === 'login' ? '登录' : '注册并登录'}
-              </button>
-              {vision.error && <p role="alert" className="form-error">{vision.error}</p>}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="account-signed-in">
-              <div>
-                <strong>{vision.account.user.username}</strong>
-                <p className="account-hint">
-                  今天已用 {vision.quota?.used ?? 0} / {vision.quota?.limit ?? 3} 张
-                  · 剩余 <strong>{vision.quota?.remaining ?? '—'}</strong> 张
-                  {vision.quota?.day ? ` · ${vision.quota.day}（北京时间）` : ''}
-                </p>
-              </div>
-              <button className="secondary-button" onClick={vision.signOut}><LogOut size={16} /> 退出</button>
-            </div>
-            <p className="account-hint">
-              在另一台设备的浏览器里登录同一个账号，就能接着用同样的识图次数；
-              但聊天、错题、计划仍保存在各自浏览器里，需要用下面的导出/导入搬运。
-            </p>
-          </>
-        )}
-        {vision.notice && <p role="status" className="form-ok"><Check size={14} /> {vision.notice}</p>}
-      </section>
 
       <section className="account-card">
         <h2><Download size={18} /> 导出这台设备的数据</h2>
@@ -226,7 +153,6 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
             </ul>
             <p className="account-hint">
               导出时间：{preview.exportedAt ? new Date(preview.exportedAt).toLocaleString() : '未记录'}
-              {preview.account ? ` · 导出账号：${preview.account}` : ''}
             </p>
             <fieldset className="import-strategy">
               <legend>导入方式</legend>
@@ -254,10 +180,8 @@ export function AccountView({ snapshot, onImport, onOpenGuide }: Props) {
       <section className="account-card muted-card">
         <h2>常见问题</h2>
         <dl className="faq">
-          <dt>换电脑登录同一个账号，聊天记录会自动出现吗？</dt>
-          <dd>不会。目前账号只用于云端识图计次，对话和错题都存在各自浏览器里，所以需要用导出/导入搬运。这样做的好处是数据不经过服务器，隐私更稳。</dd>
-          <dt>导入会把识图次数也带过来吗？</dt>
-          <dd>不会。次数按账号在服务端计算，跟这台设备的本地数据无关。</dd>
+          <dt>换电脑后聊天记录会自动出现吗？</dt>
+          <dd>不会。本站没有服务器也不设账号，对话、错题和计划都存在各自浏览器里，需要用导出/导入搬运。好处是数据不经过任何服务器。</dd>
           <dt>导出文件丢了怎么办？</dt>
           <dd>没法恢复。建议每次大改学习计划后导出一份，存到网盘或自己的电脑。</dd>
         </dl>

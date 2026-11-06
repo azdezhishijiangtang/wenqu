@@ -10,10 +10,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:vision": "node --test cloudflare/test/core.test.mjs cloudflare/test/api.test.ts",
-    "vision:deploy": "wrangler deploy --config cloudflare/wrangler.toml",
-    "vision:bundle": "node cloudflare/build.mjs",
-    "test:app": "node --test test/backup.test.ts test/storage.test.ts"
+    "test:app": "node --experimental-strip-types --no-warnings --test test/backup.test.ts test/storage.test.ts"
   },
   "dependencies": {
     "@tesseract.js-data/chi_sim": "^1.0.0",
