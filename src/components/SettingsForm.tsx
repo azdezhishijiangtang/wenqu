@@ -190,6 +190,11 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
       const entry = await getCatalog(draft.baseUrl.trim(), handle, { force })
       setCatalog(entry)
       if (entry.models.length > 0) setManualModel(false)
+      if (entry.failureReason) {
+        setModelError(
+          `实时列表获取失败，已显示${entry.source === 'builtin' ? '内置参考' : '上次缓存'}：${entry.failureReason}`,
+        )
+      }
     } catch (error) {
       setModelError(error instanceof Error ? error.message : '获取模型列表失败')
     } finally {

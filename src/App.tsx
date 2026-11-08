@@ -17,7 +17,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import './App.css'
 import { AboutView } from './components/AboutView'
 import { DataView } from './components/DataView'
@@ -131,6 +131,13 @@ export default function App() {
     defaultSettings(),
   )
   const settings = mergeSettings(storedSettings)
+  // 密钥是否真正可用由保险库决定：磁盘上只有句柄，刷新页面或空闲锁定后内存明文会被清空。
+  // 订阅保险库状态，避免界面显示「已配置」却仍在发送时弹出设置页。
+  const keyReady = useSyncExternalStore(
+    (onChange) => vault.subscribe(onChange),
+    () => vault.isHandle(settings.apiKey) && vault.has(settings.apiKey),
+    () => false,
+  )
   const [messages, setMessages] = useLocalStorage<ChatMessage[]>(
     'wenqu-chat-messages',
     [],
@@ -552,11 +559,11 @@ export default function App() {
           </button>
           <button
             type="button"
-            className={`icon-button api-icon${settings.apiKey ? ' connected' : ''}`}
+            className={`icon-button api-icon${keyReady ? ' connected' : ''}`}
             onClick={() => setSettingsOpen(true)}
             aria-label="API 设置"
           >
-            {settings.apiKey ? <Check size={18} /> : <KeyRound size={18} />}
+            {keyReady ? <Check size={18} /> : <KeyRound size={18} />}
           </button>
         </div>
 
@@ -568,7 +575,7 @@ export default function App() {
             mode={mode}
             loading={loading}
             error={error}
-            hasApiKey={Boolean(settings.apiKey)}
+            hasApiKey={keyReady}
             onInputChange={setInput}
             onSubjectChange={setSubject}
             onModeChange={setMode}

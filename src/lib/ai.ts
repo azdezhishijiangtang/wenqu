@@ -292,8 +292,9 @@ export async function streamChat({
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
+    const detail = error instanceof Error ? error.message : String(error)
     throw new Error(
-      '无法连接到接口地址。常见原因：地址写错、断网、或服务商不允许浏览器跨域（CORS）。可在「API 设置 → 测试连接」里看详细原因。',
+      `无法连接到接口地址：${detail}。仅当控制台确有 CORS 报错时才需更换跨域地址；也可在「API 设置 → 测试连接」里看详细原因。`,
     )
   }
 
@@ -384,6 +385,16 @@ export async function testConnection(settings: ApiSettings): Promise<TestResult>
   }
 
   const started = performance.now()
+  // AbortSignal.timeout() 在 Chrome / Android WebView < 103 完全不存在，103–123 也仅部分支持
+  // （超时抛 AbortError 而非 TimeoutError）。旧内核会直接抛
+  // "TypeError: AbortSignal.timeout is not a function"，请求根本发不出去。
+  // 改用全内核可用的 AbortController + setTimeout，并用 timedOut 精确区分超时与请求失败。
+  const controller = new AbortController()
+  let timedOut = false
+  const timer = window.setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, 45000)
   try {
     const response = await vault.secureFetch(normalizeBaseUrl(settings.baseUrl), {
       method: 'POST',
@@ -398,7 +409,7 @@ export async function testConnection(settings: ApiSettings): Promise<TestResult>
           false,
         ),
       ),
-      signal: AbortSignal.timeout(45000),
+      signal: controller.signal,
     })
 
     if (!response.ok) {
@@ -421,13 +432,15 @@ export async function testConnection(settings: ApiSettings): Promise<TestResult>
       message: `连接成功，模型 ${settings.model.trim()} 返回正常，耗时 ${latency}ms。`,
     }
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'TimeoutError') {
+    if (timedOut) {
       return { ok: false, message: '连接超时（45 秒）。请检查接口地址与网络。' }
     }
+    const detail = error instanceof Error ? error.message : String(error)
     return {
       ok: false,
-      message:
-        '浏览器无法访问该地址。常见原因：地址拼写错误、网络不通、或服务商未开放跨域（CORS）——浏览器控制台会有 CORS 报错，此时需要换成允许跨域的地址或自建转发。',
+      message: `请求未能发出：${detail}。仅当浏览器控制台确有 CORS 报错时，才需要换用允许跨域的接口地址或自建转发。`,
     }
+  } finally {
+    window.clearTimeout(timer)
   }
 }

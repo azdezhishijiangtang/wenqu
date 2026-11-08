@@ -33,6 +33,8 @@ export interface CatalogEntry {
   fetchedAt: number
   /** remote 数据已超过 TTL（仍可用，建议刷新） */
   stale?: boolean
+  /** 实时拉取失败的具体原因（已回退旧缓存或内置目录时仍会带回，供 UI 显示真实错误） */
+  failureReason?: string
 }
 
 interface CacheEntry {
@@ -252,7 +254,11 @@ export async function fetchModels(
   }
 
   if (lastError instanceof Error) throw lastError
-  throw new Error('无法获取模型列表，请检查接口地址与跨域（CORS）设置。')
+  const detail = lastError == null ? '未收到任何有效响应' : String(lastError)
+  // 不再把一切异常笼统归因为 CORS：旧内核缺失 Web API、DNS 失败、断网都会走到这里。
+  throw new Error(
+    `无法获取模型列表：${detail}。请检查接口地址、密钥与网络；仅当控制台确有 CORS 报错时才需更换跨域地址。`,
+  )
 }
 
 /**
@@ -287,16 +293,19 @@ export async function getCatalog(
     cache[key] = entry
     writeCache(cache)
     return { ...entry, stale: false }
-  } catch {
-    if (hit) return { ...hit, stale: true }
-    const builtin = builtinModelsFor(baseUrl)
-    if (builtin.length > 0) {
-      const entry: CacheEntry = { models: builtin, source: 'builtin', fetchedAt: now }
-      cache[key] = entry
-      writeCache(cache)
-      return { ...entry, stale: false }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    if (hit) return { ...hit, stale: true, failureReason: reason }
+    // 失败结果不写入 24h 缓存：一次网络抖动不该挡住后续自动重试。
+    // 同时把真实原因回传，让界面明确说明是密钥、HTTP 还是网络问题，而不是甩锅 CORS。
+    const entry: CatalogEntry = {
+      models: builtinModelsFor(baseUrl),
+      source: 'builtin',
+      fetchedAt: 0,
+      stale: false,
+      failureReason: reason,
     }
-    return { models: [], source: 'builtin', fetchedAt: 0, stale: false }
+    return entry
   } finally {
     clearTimeout(timer)
   }
