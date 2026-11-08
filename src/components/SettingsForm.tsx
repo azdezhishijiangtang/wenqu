@@ -7,6 +7,7 @@ import {
   EyeOff,
   KeyRound,
   LoaderCircle,
+  RefreshCw,
   ShieldCheck,
   SquareTerminal,
   X,
@@ -14,6 +15,12 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { testConnection } from '../lib/ai'
 import { vault } from '../lib/byokVault'
+import {
+  describeCatalogAge,
+  getCatalog,
+  retiredModelHint,
+  type CatalogEntry,
+} from '../lib/modelCatalog'
 import type { TestResult } from '../lib/ai'
 import type { ApiSettings } from '../types'
 
@@ -36,38 +43,60 @@ const presets: {
     id: 'deepseek',
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
-    model: 'deepseek-chat',
-    hint: 'chat 为通用对话模型；reasoner 为深度推理模型，答题更强但更慢。',
+    model: 'deepseek-flash',
+    hint: '模型名单随服务商更新，点下方「获取可用模型」即可拉取当前列表。',
   },
   {
     id: 'zhipu',
     name: '智谱 GLM',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    model: 'glm-4.7',
-    hint: '填你实际开通的模型名，如 glm-4.7、glm-4.7-thinking。',
+    model: 'glm-5.3',
+    hint: '以当前账号实际开通的模型为准，可自动获取列表。',
   },
   {
     id: 'moonshot',
     name: 'Kimi',
     baseUrl: 'https://api.moonshot.cn/v1',
-    model: 'moonshot-v1-32k',
-    hint: '长题目、整卷拍照转文字后粘贴，用 32k 以上更稳。',
+    model: 'kimi-k3',
+    hint: '以当前账号实际可用的模型为准，可自动获取列表。',
   },
   {
     id: 'openai',
     name: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
-    model: 'gpt-4o',
-    hint: '也可填 gpt-4o-mini；推理模型填 o 系列时建议把「推理强度」调高。',
+    model: 'gpt-5.6-luna',
+    hint: '以当前账号实际可用的模型为准，可自动获取列表。',
   },
   {
     id: 'custom',
     name: '自定义',
     baseUrl: '',
     model: '',
-    hint: '任意兼容 OpenAI Chat Completions 的服务：填完整地址（一般以 /v1 结尾）、模型名和密钥。',
+    hint: '任意兼容 OpenAI Chat Completions 的服务：填完整地址（一般以 /v1 结尾）和密钥，再点「获取可用模型」；不支持时手动填写模型名。',
   },
 ]
+
+const emptyCatalog = (): CatalogEntry => ({
+  models: [],
+  source: 'builtin',
+  fetchedAt: 0,
+})
+
+/**
+ * 把「输入框里的明文 / 句柄 / 已保存配置」统一解析成保险库句柄。
+ * 组件层始终只持有句柄，明文密钥不会进入任何状态或缓存。
+ */
+function resolveKeyHandle(draft: ApiSettings, settings: ApiSettings): string | null {
+  const typed = draft.apiKey.trim()
+  if (typed && !vault.isHandle(typed)) {
+    vault.set('default', typed)
+    return vault.handleFor('default')
+  }
+  if (typed) return typed
+  const saved = settings.apiKey.trim()
+  if (saved && vault.has(saved)) return saved
+  return null
+}
 
 export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) {
   const [draft, setDraft] = useState<ApiSettings>(settings)
@@ -79,17 +108,46 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
   )
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [catalog, setCatalog] = useState<CatalogEntry>(emptyCatalog)
+  const [loadingModels, setLoadingModels] = useState(false)
+  const [modelError, setModelError] = useState<string | null>(null)
+  const [manualModel, setManualModel] = useState(false)
   const baseUrlRef = useRef<HTMLInputElement>(null)
   const vaultHostRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (!vaultHostRef.current) return
     return vault.mountVaultControls(vaultHostRef.current)
   }, [])
 
+  /** 接口地址或密钥变化后，防抖自动拉取该服务商最新模型目录（静默，不打扰用户） */
+  useEffect(() => {
+    const base = draft.baseUrl.trim()
+    if (!base) return
+    const handle = resolveKeyHandle(draft, settings)
+    if (!handle || !vault.has(handle)) return
+    const keyHandle = handle
+    const timer = window.setTimeout(() => {
+      void getCatalog(base, keyHandle)
+        .then((entry) => {
+          setCatalog(entry)
+          if (entry.models.length > 0) setManualModel(false)
+        })
+        .catch(() => {
+          /* 自动拉取静默失败：内置目录兜底，手动刷新时再给出原因 */
+        })
+    }, 700)
+    return () => window.clearTimeout(timer)
+  }, [draft.baseUrl, draft.apiKey, settings.apiKey])
+
   function patch(next: Partial<ApiSettings>) {
     setDraft((current) => ({ ...current, ...next }))
     setSaved(false)
     setTestResult(null)
+    if (next.baseUrl !== undefined || next.apiKey !== undefined) {
+      setCatalog(emptyCatalog())
+      setModelError(null)
+    }
   }
 
   function activePreset(): PresetId {
@@ -108,6 +166,34 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
     if (id === 'custom') {
       patch({ baseUrl: '', model: '' })
       window.setTimeout(() => baseUrlRef.current?.focus(), 30)
+    }
+  }
+
+  /** 手动刷新（force）或首次获取模型列表 */
+  async function loadModels(force = false) {
+    const handle = resolveKeyHandle(draft, settings)
+    if (!handle) {
+      setModelError('请先填写 API Key，或重新输入 / 解锁后再获取模型列表。')
+      return
+    }
+    if (!vault.has(handle)) {
+      setModelError('密钥已锁定，请重新输入 API Key 或输入解锁口令。')
+      return
+    }
+    if (!draft.baseUrl.trim()) {
+      setModelError('请先填写 API 地址。')
+      return
+    }
+    setLoadingModels(true)
+    setModelError(null)
+    try {
+      const entry = await getCatalog(draft.baseUrl.trim(), handle, { force })
+      setCatalog(entry)
+      if (entry.models.length > 0) setManualModel(false)
+    } catch (error) {
+      setModelError(error instanceof Error ? error.message : '获取模型列表失败')
+    } finally {
+      setLoadingModels(false)
     }
   }
 
@@ -143,6 +229,10 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
   }
 
   const current = activePreset()
+  const canFetchModels =
+    Boolean(draft.baseUrl.trim()) &&
+    (Boolean(draft.apiKey.trim()) ||
+      Boolean(settings.apiKey.trim() && vault.has(settings.apiKey)))
 
   return (
     <div className="settings-form">
@@ -188,17 +278,80 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
         <small>兼容 OpenAI Chat Completions。填到 /v1 即可，本站会自动补全 /chat/completions。</small>
       </label>
 
-      <label className="field">
-        <span>模型名称</span>
-        <input
-          type="text"
-          value={draft.model}
-          onChange={(event) => patch({ model: event.target.value })}
-          placeholder="deepseek-chat"
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </label>
+      <div className="field">
+        <div className="model-field-head">
+          <span>模型名称</span>
+          <button
+            type="button"
+            className="model-refresh"
+            onClick={() => void loadModels(true)}
+            disabled={loadingModels || !canFetchModels}
+          >
+            <RefreshCw size={11} className={loadingModels ? 'spin' : undefined} />
+            {loadingModels ? '正在获取…' : '获取可用模型'}
+          </button>
+        </div>
+
+        {catalog.models.length > 0 && !manualModel ? (
+          <select
+            value={draft.model}
+            onChange={(event) => patch({ model: event.target.value })}
+            aria-label="当前可用模型"
+          >
+            {!draft.model && <option value="">请选择模型</option>}
+            {draft.model && !catalog.models.includes(draft.model) && (
+              <option value={draft.model}>{draft.model}（当前）</option>
+            )}
+            {catalog.models.map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={draft.model}
+            onChange={(event) => patch({ model: event.target.value })}
+            placeholder="填模型名，或点上方按钮自动获取"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        )}
+
+        <div className="catalog-meta">
+          {modelError ? (
+            <small className="catalog-error">{modelError}</small>
+          ) : catalog.models.length > 0 ? (
+            <small>
+              {catalog.source === 'remote'
+                ? `服务商实时列表 · ${catalog.models.length} 个模型 · 更新于 ${describeCatalogAge(catalog.fetchedAt)}${catalog.stale ? '（已过期，建议刷新）' : ''}`
+                : `内置参考列表 · ${catalog.models.length} 个模型（实时拉取失败，可手动输入）`}
+            </small>
+          ) : (
+            <small>
+              {loadingModels
+                ? '正在从服务商获取最新模型列表…'
+                : '填入接口地址与密钥后自动列出当前可用模型；服务商不支持时仍可手动填写。'}
+            </small>
+          )}
+          {catalog.models.length > 0 && (
+            <button
+              type="button"
+              className="catalog-toggle"
+              onClick={() => setManualModel((value) => !value)}
+            >
+              {manualModel ? '返回列表选择' : '手动输入'}
+            </button>
+          )}
+        </div>
+
+        {retiredModelHint(draft.model) && (
+          <small className="catalog-retired">
+            模型 {draft.model} 已退役或更名，建议改用：{retiredModelHint(draft.model)}
+          </small>
+        )}
+      </div>
 
       <label className="field">
         <span>API Key</span>
@@ -293,10 +446,10 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
               <div className="reasoning-row">
                 {(
                   [
-                    { id: 'off', label: '不发送', hint: '兼容所有模型，DeepSeek 用模型名区分推理' },
+                    { id: 'off', label: '不发送', hint: '兼容所有模型，不额外发送推理参数' },
                     { id: 'low', label: '低', hint: '' },
                     { id: 'medium', label: '中', hint: '' },
-                    { id: 'high', label: '高', hint: 'o 系列 / GLM 思考模型的深度推理' },
+                    { id: 'high', label: '高', hint: '需要更多推理预算时选用，以模型实际支持为准' },
                   ] as const
                 ).map((option) => (
                   <button

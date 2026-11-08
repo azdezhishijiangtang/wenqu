@@ -3784,3 +3784,68 @@ button:disabled {
   .bili-card { padding: 14px 15px; }
   .bili-button { width: 100%; justify-content: center; }
 }
+
+/* 模型目录：按接口地址与密钥自动识别当前可用模型 */
+.field .model-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.model-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.model-refresh:disabled {
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d0c6;
+  border-radius: 5px;
+  outline: 0;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.field select:focus {
+  border-color: #94b4a5;
+}
+
+.catalog-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.catalog-meta .catalog-toggle {
+  padding: 0;
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  font-size: 9px;
+  text-decoration: underline;
+}
+
+.field small.catalog-error,
+.field small.catalog-retired {
+  color: #8a4534;
+}

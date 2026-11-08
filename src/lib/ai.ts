@@ -80,7 +80,7 @@ interface ChatRequest {
 export function defaultSettings(): ApiSettings {
   return {
     baseUrl: 'https://api.deepseek.com/v1',
-    model: 'deepseek-chat',
+    model: 'deepseek-flash',
     apiKey: '',
     maxTokens: '',
     temperature: '',
@@ -362,7 +362,7 @@ export async function streamChat({
 
   if (!receivedText) {
     throw new Error(
-      '接口已连通但没有返回文本。若使用的是推理模型（如 deepseek-reasoner），请确认模型名正确；也可检查「高级 · 额外请求体」是否覆盖了必要字段。',
+      '接口已连通但没有返回文本。请确认模型名正确、该模型支持对话接口；也可检查「高级 · 额外请求体」是否覆盖了必要字段。',
     )
   }
 }
