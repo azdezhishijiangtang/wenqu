@@ -42,6 +42,20 @@ export function VisionBridge({ images, question, onClose, onConfirm }: Props) {
     setBusy(true); setError(''); setChecked(false)
     setStatus('正在加载本地识别引擎和中英文字库，首次使用较慢…')
     let current: Worker | null = null
+    // BASE_URL 是 './' 这类相对路径，必须以当前页面 URL 为基准解析。
+    // 用 window.location.origin 会丢掉 GitHub Pages 的仓库子路径（/wenqu/、/gezhi/highschool/），
+    // 引擎和字库会全部请求到域根 /ocr/ 得到 404，识别必然失败。
+    const base = new URL(`${import.meta.env.BASE_URL}ocr/`, document.baseURI).href
+    const diagnose = async () => {
+      const assets = ['worker.min.js', 'tesseract-core-simd-lstm.wasm.js', 'chi_sim.traineddata.gz', 'eng.traineddata.gz']
+      const bad = await Promise.all(assets.map(async name => {
+        try {
+          const r = await fetch(`${base}${name}`, { method: 'HEAD' })
+          return r.ok ? '' : `${name} → HTTP ${r.status}`
+        } catch { return `${name} → 网络错误` }
+      }))
+      return bad.filter(Boolean)
+    }
     timer.current = setTimeout(() => {
       if (id !== run.current) return
       stopWorker(); setBusy(false)
@@ -50,7 +64,6 @@ export function VisionBridge({ images, question, onClose, onConfirm }: Props) {
     try {
       const { createWorker, OEM } = await import('tesseract.js')
       if (id !== run.current) return
-      const base = new URL(`${import.meta.env.BASE_URL}ocr/`, window.location.origin).href
       current = await createWorker(['chi_sim', 'eng'], OEM.LSTM_ONLY, {
         workerPath: `${base}worker.min.js`, corePath: base, langPath: base,
         logger: event => {
@@ -70,8 +83,13 @@ export function VisionBridge({ images, question, onClose, onConfirm }: Props) {
       }
       setText(results.join('\n\n'))
       setStatus('文字提取完成。请逐图核对，尤其是负号、指数、下标、单位和选项。')
-    } catch {
-      if (id === run.current) setError('本地识别未完成：可能是资源下载失败、浏览器不支持或内存不足。请重试、减少图片，或手工填写。')
+    } catch (e) {
+      if (id !== run.current) return
+      const reason = e instanceof Error ? e.message : String(e)
+      setError(`本地识别未完成：${reason}。可能是引擎/字库资源下载失败、浏览器不支持 WebAssembly 或内存不足。请刷新重试、减少图片，或手工填写。`)
+      void diagnose().then(bad => {
+        if (id === run.current && bad.length) setError(`本地识别未完成：以下资源无法加载（${bad.join('、')}）。请确认站点已部署 ocr 目录，刷新后重试，或手工填写。`)
+      })
     } finally {
       if (current) void current.terminate().catch(() => {})
       if (id === run.current) {
