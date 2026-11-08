@@ -120,16 +120,27 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
     return vault.mountVaultControls(vaultHostRef.current)
   }, [])
 
+  // 防抖回调里始终读最新表单值，避免 700ms 内继续编辑时拿到过期闭包
+  const draftRef = useRef(draft)
+  const settingsRef = useRef(settings)
+  useEffect(() => {
+    draftRef.current = draft
+    settingsRef.current = settings
+  }, [draft, settings])
+
   /** 接口地址或密钥变化后，防抖自动拉取该服务商最新模型目录（静默，不打扰用户） */
   useEffect(() => {
-    const base = draft.baseUrl.trim()
+    const base = draftRef.current.baseUrl.trim()
     if (!base) return
-    const handle = resolveKeyHandle(draft, settings)
+    const handle = resolveKeyHandle(draftRef.current, settingsRef.current)
     if (!handle || !vault.has(handle)) return
     const keyHandle = handle
+    let cancelled = false
     const timer = window.setTimeout(() => {
       void getCatalog(base, keyHandle)
         .then((entry) => {
+          // 地址/Key 在请求期间又变了，丢弃这次结果，防止旧响应覆盖新目录
+          if (cancelled) return
           setCatalog(entry)
           if (entry.models.length > 0) setManualModel(false)
         })
@@ -137,7 +148,10 @@ export function SettingsForm({ settings, onSave, onClose }: SettingsModalProps) 
           /* 自动拉取静默失败：内置目录兜底，手动刷新时再给出原因 */
         })
     }, 700)
-    return () => window.clearTimeout(timer)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [draft.baseUrl, draft.apiKey, settings.apiKey])
 
   function patch(next: Partial<ApiSettings>) {

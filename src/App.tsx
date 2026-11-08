@@ -255,7 +255,12 @@ export default function App() {
       if (tail.reasoning) appendReasoning(tail.reasoning)
       if (tail.content) appendContent(tail.content)
     } catch (caught) {
-      if (caught instanceof DOMException && caught.name === 'AbortError') {
+      // 兼容层在老内核用普通 Error 模拟 AbortError，DOMException 判断会漏掉
+      const isAbort =
+        typeof caught === 'object' &&
+        caught !== null &&
+        (caught as { name?: string }).name === 'AbortError'
+      if (isAbort) {
         setMessages((current) =>
           current.map((message) =>
             message.id === assistantId && !message.content
@@ -271,7 +276,8 @@ export default function App() {
       }
     } finally {
       setLoading(false)
-      abortRef.current = null
+      // 只清理自己的 controller，避免旧请求结束时误清新请求的停止句柄
+      if (abortRef.current === controller) abortRef.current = null
     }
   }
 

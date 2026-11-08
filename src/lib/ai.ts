@@ -341,44 +341,58 @@ export async function streamChat({
   let buffer = ''
   let receivedText = false
 
+  /** 处理一条 SSE 行：解析失败只跳过该行，服务端业务错误必须原样抛出 */
+  const processLine = (rawLine: string): void => {
+    const line = rawLine.trim()
+    if (!line.startsWith('data:')) return
+    const data = line.slice(5).trim()
+    if (!data || data === '[DONE]') return
+
+    let parsed: {
+      choices?: {
+        delta?: { content?: string; reasoning_content?: string }
+        message?: { content?: string; reasoning_content?: string }
+      }[]
+      error?: { message?: string }
+    }
+    try {
+      parsed = JSON.parse(data) as typeof parsed
+    } catch {
+      // 流被 TCP 分包切断导致 JSON 不完整：跳过这一行，不影响后续内容
+      return
+    }
+    // 业务错误在 try 之外抛出，避免被「忽略不完整行」的 catch 一起吞掉
+    if (parsed.error?.message) throw new Error(parsed.error.message)
+    const choice = parsed.choices?.[0]
+    const reasoning = choice?.delta?.reasoning_content ?? choice?.message?.reasoning_content
+    if (reasoning) onReasoning?.(reasoning)
+    const chunk = choice?.delta?.content ?? choice?.message?.content ?? ''
+    if (chunk) {
+      receivedText = true
+      onContent(chunk)
+    }
+  }
+
   while (true) {
     const { done, value } = await reader.read()
+    // 兼容层在老内核会剥离 signal，主动中止后 fetch 仍会继续吐字：这里补一道检查
+    if (signal?.aborted) {
+      const aborted = new Error('已停止生成')
+      aborted.name = 'AbortError'
+      throw aborted
+    }
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim()
-      if (!line.startsWith('data:')) continue
-      const data = line.slice(5).trim()
-      if (!data || data === '[DONE]') continue
-
-      try {
-        const parsed = JSON.parse(data) as {
-          choices?: {
-            delta?: { content?: string; reasoning_content?: string }
-            message?: { content?: string; reasoning_content?: string }
-          }[]
-          error?: { message?: string }
-        }
-        if (parsed.error?.message) throw new Error(parsed.error.message)
-        const choice = parsed.choices?.[0]
-        const reasoning = choice?.delta?.reasoning_content ?? choice?.message?.reasoning_content
-        if (reasoning) onReasoning?.(reasoning)
-        const chunk = choice?.delta?.content ?? choice?.message?.content ?? ''
-        if (chunk) {
-          receivedText = true
-          onContent(chunk)
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message !== 'Unexpected end of JSON input') {
-          if (data.length < 500) throw error
-        }
-      }
-    }
+    const parts = buffer.split('\n')
+    buffer = parts.pop() ?? ''
+    for (const rawLine of parts) processLine(rawLine)
   }
+
+  // 流结束：flush 解码器里残留的多字节序列，并处理最后一条未以换行结尾的 SSE 行。
+  // 缺了这两步，末尾一段内容会丢失，中文也可能出现替换字符。
+  buffer += decoder.decode()
+  if (buffer.trim()) processLine(buffer)
 
   if (!receivedText) {
     throw new Error(
