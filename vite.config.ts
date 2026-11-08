@@ -7,4 +7,5 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   base: './',
   plugins: [react()],
+  build: { target: 'es2018' },
 })

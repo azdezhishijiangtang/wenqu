@@ -1,3 +1,4 @@
+import { canReadStream, parsePayloads, readResponseText } from './compat'
 import type { ApiSettings, Subject, TutorMode } from '../types'
 import { vault } from './byokVault'
 
@@ -304,20 +305,38 @@ export async function streamChat({
     )
   }
 
-  if (!response.body) {
-    const data = (await response.json()) as {
-      choices?: {
-        message?: { content?: string; reasoning_content?: string }
-      }[]
+  if (!canReadStream(response)) {
+    // 流式不可用（iOS Safari 旧版 / 部分定制 WebView / XHR 兜底）：
+    // 一次性读回完整响应，兼容 SSE 文本与服务商直接返回的完整 JSON。
+    let gotText = false
+    let serverError = ''
+    for (const data of parsePayloads(await readResponseText(response))) {
+      try {
+        const parsed = JSON.parse(data) as {
+          choices?: {
+            delta?: { content?: string; reasoning_content?: string }
+            message?: { content?: string; reasoning_content?: string }
+          }[]
+          error?: { message?: string }
+        }
+        if (parsed.error?.message) { serverError = parsed.error.message; continue }
+        const choice = parsed.choices?.[0]
+        const reasoning = choice?.delta?.reasoning_content ?? choice?.message?.reasoning_content
+        if (reasoning) onReasoning?.(reasoning)
+        const chunk = choice?.delta?.content ?? choice?.message?.content ?? ''
+        if (chunk) { gotText = true; onContent(chunk) }
+      } catch { /* 忽略不完整行 */ }
     }
-    const content = data.choices?.[0]?.message?.content
-    if (!content) throw new Error('接口返回了空内容，请检查模型是否支持对话接口。')
-    onReasoning?.(data.choices?.[0]?.message?.reasoning_content || '')
-    onContent(content)
+    if (serverError) throw new Error(serverError)
+    if (!gotText) {
+      throw new Error(
+        '接口已连通但没有返回文本。请确认模型名正确、该模型支持对话接口；也可检查「高级 · 额外请求体」是否覆盖了必要字段。',
+      )
+    }
     return
   }
 
-  const reader = response.body.getReader()
+  const reader = (response.body as ReadableStream<Uint8Array>).getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   let receivedText = false
